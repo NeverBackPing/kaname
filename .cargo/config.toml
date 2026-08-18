@@ -1,8 +1,6 @@
 [build]
-target = "x86_64-unknown-none"
+target = "i686-kfs.json"
 
 [unstable]
 build-std = ["core", "alloc"]
-
-[target.x86_64-unknown-none]
-rustflags = ["-C", "relocation-model=static"]
+json-target-spec = true
