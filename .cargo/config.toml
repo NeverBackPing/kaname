@@ -1,5 +1,11 @@
 [build]
+#Config custom 
 target = ".cargo/i686-kfs.json"
+
+#
+[target.i686-kfs-elf]
+linker = "rust-lld"
+rustflags = ["-C", "link-arg=-Tlinker.ld"]
 
 [unstable]
 build-std = ["core", "alloc"]
