@@ -1,22 +1,34 @@
+use core::ffi::c_void;
+
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memcpy(dest: *mut u8, src: *const u8, n: usize) -> *mut u8 {
+pub unsafe extern "C" fn memcpy(dest: *mut c_void, src: *const c_void, n: usize) -> *mut c_void {
+    let dest = dest as *mut u8;
+    let src = src as *const u8;
+
     for i in 0..n {
         unsafe {
             *dest.add(i) = *src.add(i);
         }
     }
-    dest
+    dest as *mut c_void
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memmove(dest: *mut u8, src: *const u8, mut n: usize) -> *mut u8 {
+pub unsafe extern "C" fn memmove(
+    dest: *mut c_void,
+    src: *const c_void,
+    mut n: usize,
+) -> *mut c_void {
+    let dest = dest as *mut u8;
+    let src = src as *const u8;
+
     if dest as *const u8 <= src {
         for i in 0..n {
             unsafe {
                 *dest.add(i) = *src.add(i);
             }
         }
-        return dest;
+        return dest as *mut c_void;
     }
     while n > 0 {
         n -= 1;
@@ -24,11 +36,12 @@ pub unsafe extern "C" fn memmove(dest: *mut u8, src: *const u8, mut n: usize) ->
             *dest.add(n) = *src.add(n);
         }
     }
-    dest
+    dest as *mut c_void
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memset(dest: *mut u8, c: i32, n: usize) -> *mut u8 {
+pub unsafe extern "C" fn memset(dest: *mut c_void, c: i32, n: usize) -> *mut c_void {
+    let dest = dest as *mut u8;
     let pattern: usize = 0x01010101 * (c as u8 as usize);
     let mut i: usize = 0;
 
@@ -52,11 +65,13 @@ pub unsafe extern "C" fn memset(dest: *mut u8, c: i32, n: usize) -> *mut u8 {
         }
         i += 1;
     }
-    dest
+    dest as *mut c_void
 }
 
 #[unsafe(no_mangle)]
-pub unsafe extern "C" fn memcmp(a: *const u8, b: *const u8, n: usize) -> i32 {
+pub unsafe extern "C" fn memcmp(a: *const c_void, b: *const c_void, n: usize) -> i32 {
+    let a = a as *const u8;
+    let b = b as *const u8;
     let mut i: usize = 0;
 
     while i < n {
