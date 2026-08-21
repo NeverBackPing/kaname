@@ -1,6 +1,6 @@
 use core::arch::asm;
 
-pub fn outb(port: u16, val: u8) -> () {
+pub fn outb(port: u16, val: u8) {
     unsafe {
         asm!(
             "out dx, al",

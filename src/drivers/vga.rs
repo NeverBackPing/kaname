@@ -35,7 +35,7 @@ fn entry(c: u8, fg: Color, bg: Color) -> u16 {
     (c as u16) | ((attr as u16) << 8)
 }
 
-pub fn init() -> () {
+pub fn init() {
     let terminal = TERMINAL.0.get();
     unsafe {
         (*terminal).clear_screen(Color::Black);
@@ -81,7 +81,7 @@ impl Writer {
             }
         }
     }
-    
+
     pub fn enable_cursor(&mut self, start: u8, end: u8) {
         ports::outb(0x3D4, 0x0A);
         ports::outb(0x3D5, (ports::inb(0x3D5) & 0xC0) | start);
