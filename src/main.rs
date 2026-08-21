@@ -10,11 +10,13 @@ global_asm!(include_str!("boot.S"), options(raw));
 mod drivers;
 mod libk;
 mod ports;
+mod idt;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     drivers::vga::init();
     println!("42");
+    idt::init_pic();
 
     #[allow(clippy::empty_loop)]
     loop {
