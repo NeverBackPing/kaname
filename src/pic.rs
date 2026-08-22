@@ -15,7 +15,7 @@ fn io_wait() {
     outb(0x80, 0);
 }
 
-pub fn init_pic() {
+pub fn init() {
     // Init
     outb(MASTER_CMD, 0x11);
     io_wait();
