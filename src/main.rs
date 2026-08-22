@@ -14,8 +14,10 @@ mod idt;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
+    
     drivers::vga::init();
     idt::init_pic();
+    
     println!("42");
 
     #[allow(clippy::empty_loop)]

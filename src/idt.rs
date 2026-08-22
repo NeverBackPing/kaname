@@ -42,11 +42,12 @@ pub fn init_pic()
     outb(SLAVE_DATA, SLAVE_PIC);
     io_wait();
 
-
     // Link Master/Slave
-    outb(MASTER_DATA, 0x04); // Mastering IRQ2 
+    // Mastering IRQ2 
+    outb(MASTER_DATA, 0x04);
     io_wait();
-    outb(SLAVE_DATA, 0x02); // connect IRQ2
+    // connect IRQ2
+    outb(SLAVE_DATA, 0x02);
     io_wait();
 
     // def the mode
