@@ -1,5 +1,5 @@
-use core::arch::asm;
 use crate::ports::outb;
+use core::arch::asm;
 
 //IO PIC 8259
 const MASTER_CMD: u16 = 0x20;
