@@ -1,5 +1,4 @@
-use crate::ports::outb;
-use core::arch::asm;
+use crate::ports::{inb, outb};
 
 //IO PIC 8259
 const MASTER_CMD: u16 = 0x20;
@@ -13,9 +12,7 @@ const SLAVE_PIC: u8 = 0x28; // 40
 // Wait for give time
 #[inline(always)]
 fn io_wait() {
-    unsafe {
-        asm!("pause", options(nomem, nostack, preserves_flags));
-    }
+    outb(0x80, 0);
 }
 
 pub fn init_pic() {
@@ -45,4 +42,31 @@ pub fn init_pic() {
     io_wait();
     outb(SLAVE_DATA, 0x01);
     io_wait();
+}
+
+pub fn IRQ_set_mask(IRQline: u8) {
+    let port: u16;
+    let value: u8;
+
+    if (IRQline < 8) {
+        port = MASTER_DATA;
+    } else {
+        port = SLAVE_DATA;
+    }
+    value = inb(port) | (1 << IRQline);
+    outb(port, value);
+}
+
+pub fn IRQ_clear_mask(mut IRQline: u8) {
+    let port: u16;
+    let value: u8;
+
+    if (IRQline < 8) {
+        port = MASTER_DATA;
+    } else {
+        port = SLAVE_DATA;
+        IRQline -= 8;
+    }
+    value = inb(port) | (1 << IRQline);
+    outb(port, value);
 }
