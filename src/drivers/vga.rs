@@ -131,7 +131,7 @@ impl Writer {
             b'\n' => self.newline(),
             byte => {
                 if self.col >= WIDTH {
-                    self.newline()
+                    self.newline();
                 }
                 self.put_at(self.row, self.col, byte);
                 self.col += 1;
@@ -165,4 +165,9 @@ pub fn _print(args: fmt::Arguments) {
 macro_rules! println {
     () => ($crate::drivers::vga::_print(format_args!("\n")));
     ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!("{}\n", format_args!($($arg)*))));
+}
+
+#[macro_export]
+macro_rules! print {
+    ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!($($arg)*)));
 }
