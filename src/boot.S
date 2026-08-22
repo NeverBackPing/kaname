@@ -6,7 +6,7 @@
 .set MAGIC, 0x1BADB002          # Multiboot addr
 .set CHECKSUM, -(MAGIC + FLAGS) # Ensure the header checksum equals 0
 
-.section .multiboot
+.section .multiboot, "a"
 .align 4
 .long MAGIC
 .long FLAGS

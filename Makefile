@@ -22,11 +22,11 @@ ISO := kfs.iso
 ELF:= iso/boot/kfs
 
 header:
-	@echo "$(BLUE)$$HEADER$(RESET)"
+	@printf "$(BLUE)$$HEADER$(RESET)\n"
 
 build:
 	cargo build --release
-	@echo "\n$(BLUE)$$HEADER$(RESET)"
+	@printf "\n$(BLUE)$$HEADER$(RESET)\n"
 
 iso: build
 	mkdir -p $(ISO_DIR)/boot/grub

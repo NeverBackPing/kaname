@@ -1,48 +1,45 @@
 ENTRY(_start)
 
-SECTIONS
-{
-    /* Adresse de chargement du kernel*/
-	. = 2M;
+SECTIONS {
+  /* Kernel load address */
+  . = 1M;
 
-    __kernel_start = .;
+  __kernel_start = .;
 
-	/* 
-        First put the multiboot header
+  /*
+  First put the multiboot header
+  */
+  .boot ALIGN(4) : {
+    KEEP(*(.multiboot))
+  }
 
-    */
-    .boot BLOCK(4K) : ALIGN(4K)
-    {
-		*(.multiboot)
-    }
+  .text : ALIGN(4K) {
+    *(.text)
+    *(.text.*)
+  }
 
-	.text BLOCK(4K) : ALIGN(4K)
-	{
-		*(.text)
-	}
+  __data_start = .;
+  /* Read-only data. */
+  .rodata : ALIGN(4K) {
+    *(.rodata)
+    *(.rodata.*)
+  }
 
-    __data_start = .;
-	/* Read-only data. */
-	.rodata BLOCK(4K) : ALIGN(4K)
-	{
-		*(.rodata)
-	}
+  /* Read-write data (initialized) */
+  .data : ALIGN(4K) {
+    *(.data)
+    *(.data.*)
+  }
 
-	/* Read-write data (initialized) */
-	.data BLOCK(4K) : ALIGN(4K)
-	{
-		*(.data)
-	}
+  /* Read-write data (uninitialized) and stack */
+  .bss : ALIGN(4K) {
+    _bss_start = .;
+    *(COMMON)
+    *(.bss)
+    *(.bss.*)
+    _bss_end = .;
+  }
+  __data_end = .;
 
-	/* Read-write data (uninitialized) and stack */
-	.bss BLOCK(4K) : ALIGN(4K)
-	{
-        _bss_start = .;
-		*(COMMON)
-		*(.bss)
-        _bss_end = .;
-	}
-    __data_end = .;
-
-    __kernel_end = .;
+  __kernel_end = .;
 }
