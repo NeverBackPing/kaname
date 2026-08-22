@@ -8,16 +8,15 @@ use core::panic::PanicInfo;
 global_asm!(include_str!("boot.S"), options(raw));
 
 mod drivers;
+mod idt;
 mod libk;
 mod ports;
-mod idt;
 
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
-    
     drivers::vga::init();
     idt::init_pic();
-    
+
     println!("42");
 
     #[allow(clippy::empty_loop)]
