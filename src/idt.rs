@@ -44,29 +44,24 @@ pub fn init_pic() {
     io_wait();
 }
 
-pub fn IRQ_set_mask(IRQline: u8) {
-    let port: u16;
-    let value: u8;
+#[allow(dead_code)]
+pub fn set_mask(mut line: u8) {
+    let port: u16 = if line < 8 { MASTER_DATA } else { SLAVE_DATA };
+    if line >= 8 {
+        line -= 8
+    };
+    let value = inb(port) | (1 << line);
 
-    if (IRQline < 8) {
-        port = MASTER_DATA;
-    } else {
-        port = SLAVE_DATA;
-    }
-    value = inb(port) | (1 << IRQline);
     outb(port, value);
 }
 
-pub fn IRQ_clear_mask(mut IRQline: u8) {
-    let port: u16;
-    let value: u8;
+#[allow(dead_code)]
+pub fn clear_mask(mut line: u8) {
+    let port: u16 = if line < 8 { MASTER_DATA } else { SLAVE_DATA };
+    if line >= 8 {
+        line -= 8
+    };
 
-    if (IRQline < 8) {
-        port = MASTER_DATA;
-    } else {
-        port = SLAVE_DATA;
-        IRQline -= 8;
-    }
-    value = inb(port) | (1 << IRQline);
+    let value = inb(port) | (1 << line);
     outb(port, value);
 }
