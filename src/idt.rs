@@ -48,8 +48,8 @@ pub fn init_pic() {
 pub fn set_mask(mut line: u8) {
     let port: u16 = if line < 8 { MASTER_DATA } else { SLAVE_DATA };
     if line >= 8 {
-        line -= 8
-    };
+        line -= 8;
+    }
     let value = inb(port) | (1 << line);
 
     outb(port, value);
@@ -59,8 +59,8 @@ pub fn set_mask(mut line: u8) {
 pub fn clear_mask(mut line: u8) {
     let port: u16 = if line < 8 { MASTER_DATA } else { SLAVE_DATA };
     if line >= 8 {
-        line -= 8
-    };
+        line -= 8;
+    }
 
     let value = inb(port) | (1 << line);
     outb(port, value);

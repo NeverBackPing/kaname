@@ -12,17 +12,22 @@ mod idt;
 mod libk;
 mod ports;
 
+use drivers::keyboard::{self, Key};
+
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     drivers::vga::init();
     idt::init_pic();
+    keyboard::init();
 
     println!("42");
 
-    #[allow(clippy::empty_loop)]
     loop {
-        unsafe {
-            asm!("cli; hlt");
+        keyboard::poll();
+        if let Some(event) = keyboard::get_key()
+            && let Key::Char(c) = event.key
+        {
+            print!("{}", c as char);
         }
     }
 }
