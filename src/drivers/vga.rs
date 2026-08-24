@@ -36,6 +36,19 @@ pub enum Color {
 
 pub fn switch_terminal(tty_id: u8) {
     ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
+    let terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
+        .0
+        .get();
+    unsafe {
+        if (*terminal).id.lauch == false {
+            (*terminal).id.lauch = true;
+            if (*terminal).id.name != 0 {
+                (*terminal).clear_screen(Color::Black);
+                (*terminal).update_cursor();
+            }
+        }
+        (*terminal).update_cursor();
+    }
 }
 
 fn entry(c: u8, fg: Color, bg: Color) -> u16 {
@@ -44,14 +57,22 @@ fn entry(c: u8, fg: Color, bg: Color) -> u16 {
 }
 
 pub fn init() {
+    let mut n: u8 = 1;
     for tty in TERMINAL.iter().take(MAX_TERMINAL) {
         let terminal = tty.0.get();
         unsafe {
             (*terminal).clear_screen(Color::Black);
             (*terminal).enable_cursor(14, 15);
             (*terminal).update_cursor();
+            (*terminal).id.name = n;
         };
+        n += 1;
     }
+}
+
+pub struct InfoTty {
+    name: u8,
+    lauch: bool,
 }
 
 pub struct Writer {
@@ -59,6 +80,7 @@ pub struct Writer {
     col: usize,
     fg: Color,
     bg: Color,
+    id: InfoTty,
 }
 
 impl Writer {
@@ -68,6 +90,10 @@ impl Writer {
             col: 0,
             fg: Color::LightGreen,
             bg: Color::Black,
+            id: InfoTty {
+                name: 0,
+                lauch: false,
+            },
         }
     }
 

@@ -21,7 +21,7 @@ pub extern "C" fn _start() -> ! {
     keyboard::init();
 
     println!("42");
-
+    
     loop {
         keyboard::poll();
         if let Some(event) = keyboard::get_key() {
