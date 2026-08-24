@@ -44,8 +44,8 @@ fn entry(c: u8, fg: Color, bg: Color) -> u16 {
 }
 
 pub fn init() {
-    for n in 0..MAX_TERMINAL {
-        let terminal = TERMINAL[n].0.get();
+    for tty in TERMINAL.iter().take(MAX_TERMINAL) {
+        let terminal = tty.0.get();
         unsafe {
             (*terminal).clear_screen(Color::Black);
             (*terminal).enable_cursor(14, 15);
