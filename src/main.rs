@@ -14,6 +14,8 @@ mod ports;
 
 use drivers::keyboard::{self, Key};
 
+use crate::drivers::vga::switch_terminal;
+
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     drivers::vga::init();
@@ -24,10 +26,14 @@ pub extern "C" fn _start() -> ! {
 
     loop {
         keyboard::poll();
-        if let Some(event) = keyboard::get_key()
-            && let Key::Char(c) = event.key
-        {
-            print!("{}", c as char);
+        if let Some(event) = keyboard::get_key(){
+
+            if let Key::Function(fn_key) = event.key{
+                drivers::vga::switch_terminal(fn_key);
+            }
+            if let Key::Char(c) = event.key{
+                print!("{}", c as char);
+            }
         }
     }
 }

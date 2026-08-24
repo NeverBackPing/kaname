@@ -1,12 +1,16 @@
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ptr::{read_volatile, write_volatile};
+use core::sync::atomic::{AtomicU8, Ordering};
 
 use crate::ports;
 
 const VGA_BUFFER: *mut u16 = 0xb8000 as *mut u16;
 const WIDTH: usize = 80;
 const HEIGHT: usize = 25;
+const MAX_TERMINAL: usize = 6;
+
+static ACTIVE_TERMINAL: AtomicU8 = AtomicU8::new(0);
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
@@ -30,18 +34,24 @@ pub enum Color {
     White = 15,
 }
 
+pub fn switch_terminal(tty_id: u8) {
+    ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
+}
+
 fn entry(c: u8, fg: Color, bg: Color) -> u16 {
     let attr = (fg as u8) | ((bg as u8) << 4);
     (c as u16) | ((attr as u16) << 8)
 }
 
 pub fn init() {
-    let terminal = TERMINAL.0.get();
-    unsafe {
-        (*terminal).clear_screen(Color::Black);
-        (*terminal).enable_cursor(14, 15);
-        (*terminal).update_cursor();
-    };
+    for n in 0..MAX_TERMINAL {
+        let terminal = TERMINAL[n].0.get();
+        unsafe {
+            (*terminal).clear_screen(Color::Black);
+            (*terminal).enable_cursor(14, 15);
+            (*terminal).update_cursor();
+        };
+    }
 }
 
 pub struct Writer {
@@ -153,12 +163,25 @@ impl fmt::Write for Writer {
 struct Terminal(UnsafeCell<Writer>);
 unsafe impl Sync for Terminal {}
 
-static TERMINAL: Terminal = Terminal(UnsafeCell::new(Writer::new()));
+static TERMINAL: [Terminal; MAX_TERMINAL] = [
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+];
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    unsafe { (*TERMINAL.0.get()).write_fmt(args).unwrap() };
+    unsafe {
+        (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
+            .0
+            .get())
+        .write_fmt(args)
+        .unwrap()
+    };
 }
 
 #[macro_export]
