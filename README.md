@@ -16,11 +16,11 @@ The name Kaname (要) stands for "essence" / "main point" in Japanese, it is mea
 - VGA scrollback buffer
 - 8259 PIC + interrupt handling
 - PS/2 keyboard driver (US QWERTY, ring buffer)
+- IDT setup
+- GDT setup
 
 ### Working on
 
-- IDT setup
-- GDT setup
 - Virtual terminals
 
 ### Planned
