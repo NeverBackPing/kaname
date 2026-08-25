@@ -24,6 +24,7 @@ pub extern "C" fn _start() -> ! {
 
     println!("42");
 
+    idt::enable_interrupts();
     loop {
         if let Some(event) = keyboard::get_key() {
             if let Key::Function(fn_key) = event.key {
