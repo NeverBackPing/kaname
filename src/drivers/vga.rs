@@ -35,42 +35,46 @@ pub enum Color {
 }
 
 pub fn save_tty(terminal: &mut Writer) {
-    for i in 0..HEIGHT {
-        for j in 0..WIDTH {
-            let case = terminal.id.history[i][j];
+    for row in 0..HEIGHT {
+        for col in 0..WIDTH {
+            let cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
+            terminal.id.history[row][col] = cell;
+        }
+    }
+}
 
-            terminal.put_at(case.0 as usize, case.1 as usize, case.2 as u8);
+pub fn restore_tty(terminal: &mut Writer) {
+    for row in 0..HEIGHT {
+        for col in 0..WIDTH {
+            let cell = terminal.id.history[row][col];
+            unsafe { write_volatile(VGA_BUFFER.add(row * WIDTH + col), cell) };
         }
     }
 }
 
 pub fn switch_terminal(tty_id: u8) {
-    ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
-    let terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
+    let prev_terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
         .0
         .get();
     unsafe {
-        if (*terminal).id.lauch == false {
-            (*terminal).id.lauch = true;
-            if (*terminal).id.name != 0 {
-                (*terminal).clear_screen(Color::Black);
-                (*terminal).update_cursor();
-            }
-        }
-        (*terminal).clear_screen(Color::Black);
-        save_tty(&mut *terminal);
+        save_tty(&mut *prev_terminal);
+    }
+    ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
+
+    let terminal = TERMINAL[tty_id as usize].0.get();
+    unsafe {
+        restore_tty(&mut *terminal);
         (*terminal).update_cursor();
     }
 }
 
-fn entry(c: u8, fg: Color, bg: Color) -> u16 {
+const fn entry(c: u8, fg: Color, bg: Color) -> u16 {
     let attr = (fg as u8) | ((bg as u8) << 4);
     (c as u16) | ((attr as u16) << 8)
 }
 
 pub fn init() {
-
-    for(n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINAL)) {
+    for (n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINAL)) {
         let terminal = tty.0.get();
         unsafe {
             (*terminal).clear_screen(Color::Black);
@@ -83,8 +87,7 @@ pub fn init() {
 
 pub struct InfoTty {
     name: u8,
-    lauch: bool,
-    history: [[(u8, u8, char); WIDTH]; HEIGHT],
+    history: [[u16; WIDTH]; HEIGHT],
 }
 
 pub struct Writer {
@@ -104,8 +107,7 @@ impl Writer {
             bg: Color::Black,
             id: InfoTty {
                 name: 0,
-                lauch: false,
-                history: [[(0, 0, '\0'); WIDTH]; HEIGHT],
+                history: [[entry(b' ', Color::LightGreen, Color::Black); WIDTH]; HEIGHT],
             },
         }
     }
@@ -182,8 +184,6 @@ impl Writer {
                 if self.col >= WIDTH {
                     self.newline();
                 }
-                self.id.history[self.row][self.col] =
-                    (self.row as u8, self.col as u8, byte as char);
                 self.put_at(self.row, self.col, byte);
                 self.col += 1;
                 self.update_cursor();

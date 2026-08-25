@@ -22,7 +22,39 @@ pub extern "C" fn _start() -> ! {
     pic::init();
     keyboard::init();
 
-    println!("42");
+    println!(
+        "56ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        "
+    );
 
     idt::enable_interrupts();
     loop {
