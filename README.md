@@ -11,20 +11,20 @@ The name Kaname (要) stands for "essence" / "main point" in Japanese, it is mea
 
 ### Implemented
 
+- x86 bare metal target (Multiboot2 via GRUB2)
 - VGA text mode (80x25)
+- VGA scrollback buffer
+- 8259 PIC + interrupt handling
+- PS/2 keyboard driver (US QWERTY, ring buffer)
 
 ### Working on
 
-- x86 bare metal target (Multiboot2 via GRUB2)
 - IDT setup
-- 8259 PIC + interrupt handling
-- PS/2 keyboard driver (US QWERTY, ring buffer)
+- GDT setup
 - Virtual terminals
-- VGA scrollback buffer
 
 ### Planned
 
-- GDT setup
 - 8253 PIT clock
 - Kernel stack trace
 - Tiny interactive shell
