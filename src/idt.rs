@@ -1,3 +1,4 @@
+use crate::gdt::KERNEL_CODE_SEG;
 use core::arch::{asm, naked_asm};
 use core::mem::size_of;
 
@@ -33,8 +34,6 @@ enum InterruptVector {
 }
 
 const IDT_SIZE: usize = 256;
-
-const KERNEL_CODE_SEG: u16 = 0x10;
 
 #[repr(u8)]
 #[derive(Clone, Copy)]

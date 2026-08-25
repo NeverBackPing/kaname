@@ -8,6 +8,7 @@ use core::panic::PanicInfo;
 global_asm!(include_str!("boot.S"), options(raw));
 
 mod drivers;
+mod gdt;
 mod idt;
 mod libk;
 mod pic;
@@ -18,6 +19,7 @@ use drivers::keyboard::{self, Key};
 #[unsafe(no_mangle)]
 pub extern "C" fn _start() -> ! {
     drivers::vga::init();
+    gdt::init();
     idt::init();
     pic::init();
     keyboard::init();
