@@ -34,6 +34,22 @@ pub enum Color {
     White = 15,
 }
 
+pub fn save_tty(terminal: &mut Writer) {
+    for i in 0..HEIGHT {
+        
+        for j in 0..WIDTH {
+            
+            let case = terminal.id.history[i][j];
+            
+            terminal.put_at(
+                case.0 as usize,
+                case.1 as usize,
+                case.2 as u8
+            );
+        }
+    }
+}
+
 pub fn switch_terminal(tty_id: u8) {
     ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
     let terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
@@ -47,6 +63,8 @@ pub fn switch_terminal(tty_id: u8) {
                 (*terminal).update_cursor();
             }
         }
+        (*terminal).clear_screen(Color::Black);
+        save_tty(&mut *terminal);
         (*terminal).update_cursor();
     }
 }
@@ -73,6 +91,7 @@ pub fn init() {
 pub struct InfoTty {
     name: u8,
     lauch: bool,
+    history: [[(u8, u8, char); WIDTH]; HEIGHT],
 }
 
 pub struct Writer {
@@ -80,7 +99,7 @@ pub struct Writer {
     col: usize,
     fg: Color,
     bg: Color,
-    id: InfoTty,
+    pub id: InfoTty,
 }
 
 impl Writer {
@@ -93,6 +112,7 @@ impl Writer {
             id: InfoTty {
                 name: 0,
                 lauch: false,
+                history: [[(0, 0, '\0'); WIDTH]; HEIGHT],
             },
         }
     }
@@ -169,6 +189,7 @@ impl Writer {
                 if self.col >= WIDTH {
                     self.newline();
                 }
+                self.id.history[self.row][self.col]  = (self.row as u8, self.col as u8, byte as char);
                 self.put_at(self.row, self.col, byte);
                 self.col += 1;
                 self.update_cursor();
@@ -201,12 +222,12 @@ static TERMINAL: [Terminal; MAX_TERMINAL] = [
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    unsafe {
+    unsafe{
         (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
             .0
             .get())
         .write_fmt(args)
-        .unwrap()
+        .unwrap();
     };
 }
 
