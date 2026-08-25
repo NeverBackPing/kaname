@@ -6,8 +6,8 @@ const SLAVE_CMD: u16 = 0xA0;
 const MASTER_DATA: u16 = 0x21;
 const SLAVE_DATA: u16 = 0xA1;
 
-const MASTER_PIC: u8 = 0x20; // 32
-const SLAVE_PIC: u8 = 0x28; // 40
+pub const MASTER_PIC: u8 = 0x20; // 32
+pub const SLAVE_PIC: u8 = 0x28; // 40
 
 // Wait for give time
 #[inline(always)]
@@ -42,6 +42,10 @@ pub fn init() {
     io_wait();
     outb(SLAVE_DATA, 0x01);
     io_wait();
+
+    // Mask all interrupts
+    outb(MASTER_DATA, 0xFF);
+    outb(SLAVE_DATA, 0xFF);
 }
 
 #[allow(dead_code)]
@@ -62,6 +66,6 @@ pub fn clear_mask(mut line: u8) {
         line -= 8;
     }
 
-    let value = inb(port) | (1 << line);
+    let value = inb(port) & !(1 << line);
     outb(port, value);
 }
