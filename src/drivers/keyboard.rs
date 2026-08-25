@@ -1,10 +1,10 @@
 const DATA_PORT: u16 = 0x60;
-const STATUS_PORT: u16 = 0x64;
 const PIC1_CMD: u16 = 0x20;
 const PIC_EOI: u8 = 0x20;
 const KEYBOARD_IRQ: u8 = 1;
 
 use crate::idt;
+use crate::pic;
 use crate::ports;
 use core::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 
@@ -137,13 +137,9 @@ pub fn get_key() -> Option<KeyEvent> {
 }
 
 pub fn init() {
-    idt::clear_mask(KEYBOARD_IRQ);
-}
-
-pub fn poll() {
-    if ports::inb(STATUS_PORT) & 1 != 0 {
-        keyboard_handler();
-    }
+    let vector: u8 = KEYBOARD_IRQ + pic::MASTER_PIC;
+    idt::register_handler(vector, keyboard_handler);
+    pic::clear_mask(KEYBOARD_IRQ);
 }
 
 const SCANCODE_NORMAL: [u8; 128] = const {
@@ -293,7 +289,7 @@ fn snapshot_mods() -> KeyModifiers {
     }
 }
 
-fn keyboard_handler() {
+fn keyboard_handler(_: *mut idt::InterruptFrame) {
     let scancode = ports::inb(DATA_PORT);
 
     // no data
@@ -474,6 +470,7 @@ fn keyboard_handler() {
             });
         }
     }
+    eoi();
 }
 
 // end of interrupt
