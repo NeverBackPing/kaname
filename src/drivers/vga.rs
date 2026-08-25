@@ -36,16 +36,10 @@ pub enum Color {
 
 pub fn save_tty(terminal: &mut Writer) {
     for i in 0..HEIGHT {
-        
         for j in 0..WIDTH {
-            
             let case = terminal.id.history[i][j];
-            
-            terminal.put_at(
-                case.0 as usize,
-                case.1 as usize,
-                case.2 as u8
-            );
+
+            terminal.put_at(case.0 as usize, case.1 as usize, case.2 as u8);
         }
     }
 }
@@ -75,8 +69,8 @@ fn entry(c: u8, fg: Color, bg: Color) -> u16 {
 }
 
 pub fn init() {
-    let mut n: u8 = 1;
-    for tty in TERMINAL.iter().take(MAX_TERMINAL) {
+
+    for(n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINAL)) {
         let terminal = tty.0.get();
         unsafe {
             (*terminal).clear_screen(Color::Black);
@@ -84,7 +78,6 @@ pub fn init() {
             (*terminal).update_cursor();
             (*terminal).id.name = n;
         };
-        n += 1;
     }
 }
 
@@ -189,7 +182,8 @@ impl Writer {
                 if self.col >= WIDTH {
                     self.newline();
                 }
-                self.id.history[self.row][self.col]  = (self.row as u8, self.col as u8, byte as char);
+                self.id.history[self.row][self.col] =
+                    (self.row as u8, self.col as u8, byte as char);
                 self.put_at(self.row, self.col, byte);
                 self.col += 1;
                 self.update_cursor();
@@ -222,7 +216,7 @@ static TERMINAL: [Terminal; MAX_TERMINAL] = [
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    unsafe{
+    unsafe {
         (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
             .0
             .get())
