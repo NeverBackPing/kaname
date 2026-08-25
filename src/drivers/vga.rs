@@ -1,12 +1,16 @@
 use core::cell::UnsafeCell;
 use core::fmt;
 use core::ptr::{read_volatile, write_volatile};
+use core::sync::atomic::{AtomicU8, Ordering};
 
 use crate::ports;
 
 const VGA_BUFFER: *mut u16 = 0xb8000 as *mut u16;
 const WIDTH: usize = 80;
 const HEIGHT: usize = 25;
+const MAX_TERMINAL: usize = 6;
+
+static ACTIVE_TERMINAL: AtomicU8 = AtomicU8::new(0);
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
@@ -30,18 +34,64 @@ pub enum Color {
     White = 15,
 }
 
-fn entry(c: u8, fg: Color, bg: Color) -> u16 {
+pub fn save_tty(terminal: &mut Writer) {
+    for (row, history_row) in terminal.id.history.iter_mut().enumerate() {
+        for (col, cell) in history_row.iter_mut().enumerate() {
+            *cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
+        }
+    }
+}
+
+pub fn restore_tty(terminal: &mut Writer) {
+    for (row, history_row) in terminal.id.history.iter().enumerate() {
+        for (col, &cell) in history_row.iter().enumerate() {
+            unsafe {
+                write_volatile(VGA_BUFFER.add(row * WIDTH + col), cell);
+            }
+        }
+    }
+}
+
+pub fn switch_terminal(tty_id: u8) {
+    let prev_terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
+        .0
+        .get();
+
+    unsafe {
+        save_tty(&mut *prev_terminal);
+    }
+
+    ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
+
+    let terminal = TERMINAL[tty_id as usize].0.get();
+
+    unsafe {
+        restore_tty(&mut *terminal);
+        (*terminal).update_cursor();
+    }
+}
+
+const fn entry(c: u8, fg: Color, bg: Color) -> u16 {
     let attr = (fg as u8) | ((bg as u8) << 4);
     (c as u16) | ((attr as u16) << 8)
 }
 
 pub fn init() {
-    let terminal = TERMINAL.0.get();
-    unsafe {
-        (*terminal).clear_screen(Color::Black);
-        (*terminal).enable_cursor(14, 15);
-        (*terminal).update_cursor();
-    };
+    for (n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINAL)) {
+        let terminal = tty.0.get();
+
+        unsafe {
+            (*terminal).clear_screen(Color::Black);
+            (*terminal).enable_cursor(14, 15);
+            (*terminal).update_cursor();
+            (*terminal).id.name = n;
+        }
+    }
+}
+
+pub struct InfoTty {
+    name: u8,
+    history: [[u16; WIDTH]; HEIGHT],
 }
 
 pub struct Writer {
@@ -49,6 +99,7 @@ pub struct Writer {
     col: usize,
     fg: Color,
     bg: Color,
+    pub id: InfoTty,
 }
 
 impl Writer {
@@ -58,6 +109,10 @@ impl Writer {
             col: 0,
             fg: Color::LightGreen,
             bg: Color::Black,
+            id: InfoTty {
+                name: 0,
+                history: [[entry(b' ', Color::LightGreen, Color::Black); WIDTH]; HEIGHT],
+            },
         }
     }
 
@@ -68,11 +123,13 @@ impl Writer {
                 entry(c, self.fg, self.bg),
             );
         }
+
         self.update_cursor();
     }
 
     pub fn clear_screen(&mut self, color: Color) {
         self.bg = color;
+
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
                 unsafe {
@@ -97,6 +154,7 @@ impl Writer {
 
     pub fn update_cursor(&mut self) {
         let pos: u16 = (self.row * WIDTH + self.col) as u16;
+
         ports::outb(0x3D4, 0x0F);
         ports::outb(0x3D5, pos as u8);
         ports::outb(0x3D4, 0x0E);
@@ -107,22 +165,29 @@ impl Writer {
         for row in 1..HEIGHT {
             for col in 0..WIDTH {
                 let cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
-                unsafe { write_volatile(VGA_BUFFER.add((row - 1) * WIDTH + col), cell) };
+
+                unsafe {
+                    write_volatile(VGA_BUFFER.add((row - 1) * WIDTH + col), cell);
+                }
             }
         }
+
         for col in 0..WIDTH {
             self.put_at(HEIGHT - 1, col, b' ');
         }
+
         self.row = HEIGHT - 1;
     }
 
     fn newline(&mut self) {
         self.col = 0;
+
         if self.row + 1 >= HEIGHT {
             self.scroll();
         } else {
             self.row += 1;
         }
+
         self.update_cursor();
     }
 
@@ -133,6 +198,7 @@ impl Writer {
                 if self.col >= WIDTH {
                     self.newline();
                 }
+
                 self.put_at(self.row, self.col, byte);
                 self.col += 1;
                 self.update_cursor();
@@ -146,19 +212,35 @@ impl fmt::Write for Writer {
         for b in s.bytes() {
             self.write_byte(b);
         }
+
         Ok(())
     }
 }
 
 struct Terminal(UnsafeCell<Writer>);
+
 unsafe impl Sync for Terminal {}
 
-static TERMINAL: Terminal = Terminal(UnsafeCell::new(Writer::new()));
+static TERMINAL: [Terminal; MAX_TERMINAL] = [
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+    Terminal(UnsafeCell::new(Writer::new())),
+];
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
-    unsafe { (*TERMINAL.0.get()).write_fmt(args).unwrap() };
+
+    unsafe {
+        (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
+            .0
+            .get())
+        .write_fmt(args)
+        .unwrap();
+    }
 }
 
 #[macro_export]

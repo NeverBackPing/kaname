@@ -22,14 +22,48 @@ pub extern "C" fn _start() -> ! {
     pic::init();
     keyboard::init();
 
-    println!("42");
+    println!(
+        "56ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        42ggggggggggggggggggggggggggggg42ggggggggggggggggggggggggggggg\
+        "
+    );
 
     idt::enable_interrupts();
     loop {
-        if let Some(event) = keyboard::get_key()
-            && let Key::Char(c) = event.key
-        {
-            print!("{}", c as char);
+        if let Some(event) = keyboard::get_key() {
+            if let Key::Function(fn_key) = event.key {
+                drivers::vga::switch_terminal(fn_key);
+            } else if let Key::Char(c) = event.key {
+                print!("{}", c as char);
+            }
         }
         unsafe {
             asm!("hlt");

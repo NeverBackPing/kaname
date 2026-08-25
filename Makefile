@@ -42,6 +42,7 @@ run: iso
 
 clean:
 	cargo clean
-	rm $(ELF)
+	rm $(ELF) kfs.iso
+
 
 .PHONY: build iso run clean header
