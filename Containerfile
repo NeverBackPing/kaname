@@ -13,4 +13,6 @@ RUN apt install -y \
 
 WORKDIR /kfs
 
+RUN rustup default nightly
+
 CMD ["/bin/make", "run"]

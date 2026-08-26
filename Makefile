@@ -38,7 +38,13 @@ iso: build
 	mkdir -p $(ISO_DIR)/boot/grub
 	cp meta/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	cp $(KERNEL) $(ISO_DIR)/boot/kfs
-	grub-mkrescue -o $(ISO) $(ISO_DIR)
+	grub-mkrescue -o $(ISO) $(ISO_DIR) \
+		--compress=xz \
+		--core-compress=xz \
+		--fonts= \
+		--themes= \
+		--locales= \
+		--modules=
 
 run: iso
 	qemu-system-i386 -cdrom $(ISO)
