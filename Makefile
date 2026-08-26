@@ -39,8 +39,6 @@ iso: build
 	cp meta/grub.cfg $(ISO_DIR)/boot/grub/grub.cfg
 	cp $(KERNEL) $(ISO_DIR)/boot/kfs
 	grub-mkrescue -o $(ISO) $(ISO_DIR) \
-		--compress=xz \
-		--core-compress=xz \
 		--fonts= \
 		--themes= \
 		--locales= \
