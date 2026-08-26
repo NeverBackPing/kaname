@@ -8,7 +8,7 @@ use crate::ports;
 const VGA_BUFFER: *mut u16 = 0xb8000 as *mut u16;
 const WIDTH: usize = 80;
 const HEIGHT: usize = 25;
-const MAX_TERMINAL: usize = 6;
+pub const MAX_TERMINALS: usize = 6;
 
 static ACTIVE_TERMINAL: AtomicU8 = AtomicU8::new(0);
 
@@ -53,6 +53,10 @@ pub fn restore_tty(terminal: &mut Writer) {
 }
 
 pub fn switch_terminal(tty_id: u8) {
+    if tty_id >= MAX_TERMINALS as u8 {
+        return;
+    }
+
     let prev_terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
         .0
         .get();
@@ -77,7 +81,7 @@ const fn entry(c: u8, fg: Color, bg: Color) -> u16 {
 }
 
 pub fn init() {
-    for (n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINAL)) {
+    for (n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINALS)) {
         let terminal = tty.0.get();
 
         unsafe {
@@ -221,7 +225,7 @@ struct Terminal(UnsafeCell<Writer>);
 
 unsafe impl Sync for Terminal {}
 
-static TERMINAL: [Terminal; MAX_TERMINAL] = [
+static TERMINAL: [Terminal; MAX_TERMINALS] = [
     Terminal(UnsafeCell::new(Writer::new())),
     Terminal(UnsafeCell::new(Writer::new())),
     Terminal(UnsafeCell::new(Writer::new())),
@@ -241,6 +245,15 @@ pub fn _print(args: fmt::Arguments) {
         .write_fmt(args)
         .unwrap();
     }
+}
+
+pub fn putc(c: u8) {
+    unsafe {
+        (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
+            .0
+            .get())
+        .write_byte(c);
+    };
 }
 
 #[macro_export]
