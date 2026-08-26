@@ -2,11 +2,9 @@
 #![no_main]
 
 use core::arch::asm;
-use core::arch::global_asm;
 use core::panic::PanicInfo;
 
-global_asm!(include_str!("boot.S"), options(raw));
-
+mod boot;
 mod drivers;
 mod gdt;
 mod idt;
@@ -69,7 +67,7 @@ fn print_boot_screen() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn _start() -> ! {
+pub extern "C" fn kernel_main() -> ! {
     drivers::vga::init();
     gdt::init();
     idt::init();
