@@ -79,6 +79,7 @@ impl SegmentDescriptor {
     }
 }
 
+#[unsafe(link_section = ".gdt")]
 static GDT_ENTRIES: [SegmentDescriptor; GDT_ENTRY_COUNT] = [
     // 0x00 - Null descriptor
     SegmentDescriptor::NIL,
