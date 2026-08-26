@@ -24,6 +24,9 @@ ISO_DIR := iso
 ISO := kfs.iso
 ELF:= iso/boot/kfs
 
+# assume wayland display
+WAYLAND_SOCK := $(XDG_RUNTIME_DIR)/$(WAYLAND_DISPLAY)
+
 build:
 	cargo build --release
 	@printf "\n$(BLUE)$$HEADER$(RESET)\n"
@@ -39,6 +42,16 @@ iso: build
 
 run: iso
 	qemu-system-i386 -cdrom $(ISO)
+
+run-correction:
+	echo $(WAYLAND_SOCK)
+	podman build -t kfs-correction .
+	podman run --rm -it \
+		-v "$(PWD):/kfs" \
+		-v "$(WAYLAND_SOCK):/tmp/$(WAYLAND_DISPLAY)" \
+		-e WAYLAND_DISPLAY="$(WAYLAND_DISPLAY)"\
+		-e XDG_RUNTIME_DIR=/tmp \
+		kfs-correction
 
 clean:
 	cargo clean
