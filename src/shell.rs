@@ -2,8 +2,9 @@ use crate::drivers::keyboard::{self, Key, KeyEvent};
 use crate::drivers::vga::{self, *};
 use core::arch::asm;
 
+use crate::boot::{STACK, STACK_SIZE, Stack};
 use crate::ports::{inb, outb};
-use crate::println;
+use crate::{print, println};
 
 const MAX_LEN_SHELL: usize = 64;
 
@@ -162,9 +163,87 @@ pub fn execute_cmd(command: &str) {
     match command {
         "halt" => command_halt(),
         "reboot" => command_reboot(),
-        "stack" => {}
+        "stack" => command_stack(),
         "" => {}
 
         _ => println!("Unknown command: {}", command),
+    }
+}
+
+const BYTES_PER_LINE: usize = 16;
+const MAX_LINES: usize = 32;
+
+#[allow(dead_code)]
+pub fn command_stack() {
+    let esp: usize;
+
+    unsafe {
+        core::arch::asm!(
+            "mov {}, esp",
+            out(reg) esp,
+            options(nomem, nostack, preserves_flags)
+        );
+    }
+
+    let stack_start = &STACK as *const Stack as usize;
+    let stack_end = stack_start + STACK_SIZE;
+
+    let start = esp & !(BYTES_PER_LINE - 1);
+
+    println!(
+        "ESP={:#010x}  stack=[{:#010x}, {:#010x})",
+        esp, stack_start, stack_end
+    );
+
+    let mut addr = start;
+
+    for _ in 0..MAX_LINES {
+        if addr >= stack_end {
+            break;
+        }
+
+        if addr < stack_start {
+            addr += BYTES_PER_LINE;
+            continue;
+        }
+
+        print!("{:08x}  ", addr);
+
+        for i in 0..BYTES_PER_LINE {
+            if i == 8 {
+                print!(" ");
+            }
+
+            let current = addr + i;
+
+            if current < stack_end {
+                let byte = unsafe { *(current as *const u8) };
+                print!("{:02x} ", byte);
+            } else {
+                print!("   ");
+            }
+        }
+
+        print!(" ");
+
+        for i in 0..BYTES_PER_LINE {
+            let current = addr + i;
+
+            if current < stack_end {
+                let byte = unsafe { *(current as *const u8) };
+
+                if byte.is_ascii_graphic() || byte == b' ' {
+                    print!("{}", byte as char);
+                } else {
+                    print!(".");
+                }
+            } else {
+                print!(" ");
+            }
+        }
+
+        println!();
+
+        addr += BYTES_PER_LINE;
     }
 }

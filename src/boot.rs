@@ -21,19 +21,20 @@ static MULTIBOOT_HEADER: MultibootHeader = MultibootHeader {
     checksum: CHECKSUM,
 };
 
-const STACK_SIZE: usize = 16 * 1024;
+pub const STACK_SIZE: usize = 16 * 1024;
 
 #[repr(align(16))]
-struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);
+pub struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);
 
 #[unsafe(link_section = ".bss")]
-static STACK: Stack = Stack([0; STACK_SIZE]);
+pub static STACK: Stack = Stack([0; STACK_SIZE]);
 
 #[unsafe(no_mangle)]
 #[unsafe(naked)]
 pub extern "C" fn _start() -> ! {
     naked_asm!(
         "lea esp, [{stack} + {stack_size}]",
+        "xor ebp, ebp",
         "call {entry}",
         "2:",
         "hlt",
