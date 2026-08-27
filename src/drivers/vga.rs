@@ -224,22 +224,18 @@ static TERMINAL: [Terminal; MAX_TERMINALS] = [
 ];
 
 pub fn save_tty(terminal: &mut Writer) {
-    for row in 0..HEIGHT {
-        for col in 0..WIDTH {
-            terminal.id.history[row][col] =
-                unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
+    for (row, history_row) in terminal.id.history.iter_mut().enumerate() {
+        for (col, cell) in history_row.iter_mut().enumerate() {
+            *cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
         }
     }
 }
 
 pub fn restore_tty(terminal: &Writer) {
-    for row in 0..HEIGHT {
-        for col in 0..WIDTH {
+    for (row, history_row) in terminal.id.history.iter().enumerate() {
+        for (col, &cell) in history_row.iter().enumerate() {
             unsafe {
-                write_volatile(
-                    VGA_BUFFER.add(row * WIDTH + col),
-                    terminal.id.history[row][col],
-                );
+                write_volatile(VGA_BUFFER.add(row * WIDTH + col), cell);
             }
         }
     }
@@ -323,13 +319,13 @@ pub fn backspace() {
 macro_rules! println {
     () => {
         $crate::drivers::vga::_print(
-            format_args!("\n")
+            format_args!("\n"),
         )
     };
 
     ($($arg:tt)*) => {
         $crate::drivers::vga::_print(
-            format_args!("{}\n", format_args!($($arg)*))
+            format_args!("{}\n", format_args!($($arg)*)),
         )
     };
 }
@@ -338,7 +334,7 @@ macro_rules! println {
 macro_rules! print {
     ($($arg:tt)*) => {
         $crate::drivers::vga::_print(
-            format_args!($($arg)*)
+            format_args!($($arg)*),
         )
     };
 }
