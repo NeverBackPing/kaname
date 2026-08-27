@@ -13,6 +13,7 @@ mod idt;
 mod libk;
 mod pic;
 mod ports;
+mod shell;
 
 use drivers::keyboard::{self, Key};
 
