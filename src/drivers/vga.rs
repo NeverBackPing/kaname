@@ -62,10 +62,7 @@ impl Writer {
             bg: Color::Black,
             id: InfoTty {
                 name: 0,
-                history: [[
-                    entry(b' ', Color::LightGreen, Color::Black);
-                    WIDTH
-                ]; HEIGHT],
+                history: [[entry(b' ', Color::LightGreen, Color::Black); WIDTH]; HEIGHT],
             },
         }
     }
@@ -89,10 +86,7 @@ impl Writer {
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
                 unsafe {
-                    write_volatile(
-                        VGA_BUFFER.add(y * WIDTH + x),
-                        entry(b' ', self.fg, self.bg),
-                    );
+                    write_volatile(VGA_BUFFER.add(y * WIDTH + x), entry(b' ', self.fg, self.bg));
                 }
             }
         }
@@ -108,12 +102,6 @@ impl Writer {
         ports::outb(0x3D5, (ports::inb(0x3D5) & 0xE0) | end);
     }
 
-    #[allow(dead_code)]
-    pub fn disable_cursor(&mut self) {
-        ports::outb(0x3D4, 0x0A);
-        ports::outb(0x3D5, 0x20);
-    }
-
     pub fn update_cursor(&mut self) {
         let pos = (self.row * WIDTH + self.col) as u16;
 
@@ -127,14 +115,10 @@ impl Writer {
     fn scroll(&mut self) {
         for row in 1..HEIGHT {
             for col in 0..WIDTH {
-                let cell =
-                    unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
+                let cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
 
                 unsafe {
-                    write_volatile(
-                        VGA_BUFFER.add((row - 1) * WIDTH + col),
-                        cell,
-                    );
+                    write_volatile(VGA_BUFFER.add((row - 1) * WIDTH + col), cell);
                 }
             }
         }
@@ -220,6 +204,12 @@ impl fmt::Write for Writer {
     }
 }
 
+#[allow(dead_code)]
+pub fn disable_cursor() {
+    ports::outb(0x3D4, 0x0A);
+    ports::outb(0x3D5, 0x20);
+}
+
 struct Terminal(UnsafeCell<Writer>);
 
 unsafe impl Sync for Terminal {}
@@ -266,8 +256,7 @@ pub fn switch_terminal(tty_id: u8) {
         return;
     }
 
-    let previous_terminal =
-        TERMINAL[current_id as usize].0.get();
+    let previous_terminal = TERMINAL[current_id as usize].0.get();
 
     unsafe {
         save_tty(&mut *previous_terminal);
@@ -275,8 +264,7 @@ pub fn switch_terminal(tty_id: u8) {
 
     ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
 
-    let new_terminal =
-        TERMINAL[tty_id as usize].0.get();
+    let new_terminal = TERMINAL[tty_id as usize].0.get();
 
     unsafe {
         restore_tty(&*new_terminal);
@@ -308,19 +296,15 @@ pub fn init() {
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
 
-    let active =
-        ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
 
     unsafe {
-        (*TERMINAL[active].0.get())
-            .write_fmt(args)
-            .unwrap();
+        (*TERMINAL[active].0.get()).write_fmt(args).unwrap();
     }
 }
 
 pub fn putc(c: u8) {
-    let active =
-        ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
 
     unsafe {
         (*TERMINAL[active].0.get()).write_byte(c);
@@ -328,8 +312,7 @@ pub fn putc(c: u8) {
 }
 
 pub fn backspace() {
-    let active =
-        ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
 
     unsafe {
         (*TERMINAL[active].0.get()).backspace();

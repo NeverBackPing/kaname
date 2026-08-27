@@ -1,22 +1,24 @@
-use core::arch::asm;
-use crate::drivers::vga;
 use crate::drivers::keyboard::{self, Key, KeyEvent};
+use crate::drivers::vga::{self, *};
+use core::arch::asm;
 
 use crate::ports::{inb, outb};
 use crate::println;
 
-const MAX_COMMAND: usize = 64;
+const MAX_LEN_SHELL: usize = 64;
 
 pub struct Shell {
-    buffer: [u8; MAX_COMMAND],
-    length: usize,
+    buffer: [[u8; MAX_LEN_SHELL]; MAX_TERMINALS],
+    length: [usize; MAX_TERMINALS],
+    current_tty: usize,
 }
 
 impl Shell {
     pub const fn new() -> Self {
         Self {
-            buffer: [0; MAX_COMMAND],
-            length: 0,
+            buffer: [[0; MAX_LEN_SHELL]; MAX_TERMINALS],
+            length: [0; MAX_TERMINALS],
+            current_tty: 0,
         }
     }
 
@@ -39,60 +41,60 @@ impl Shell {
                 self.input_char(c);
             }
 
-            Key::Function(0) => {
-                vga::switch_terminal(0);
-            }
-
-            Key::Function(1) => {
-                vga::switch_terminal(1);
-            }
-
-            Key::Function(2) => {
-                vga::switch_terminal(2);
-            }
-
-            Key::Function(3) => {
-                vga::switch_terminal(3);
-            }
-
-            Key::Function(4) => {
-                vga::switch_terminal(4);
-            }
-
-            Key::Function(5) => {
-                vga::switch_terminal(5);
+            Key::Function(f) => {
+                self.switch_tty(f as usize);
             }
 
             _ => {}
         }
     }
 
-    pub fn input_char(&mut self, c: u8) {
-        if self.length >= MAX_COMMAND {
+    fn switch_tty(&mut self, tty: usize) {
+        if tty >= MAX_TERMINALS {
             return;
         }
 
-        self.buffer[self.length] = c;
-        self.length += 1;
+        self.current_tty = tty;
+        vga::switch_terminal(tty.try_into().unwrap());
+    }
+
+    pub fn input_char(&mut self, c: u8) {
+        let tty = self.current_tty;
+        let length = self.length[tty];
+
+        if length >= MAX_LEN_SHELL {
+            return;
+        }
+
+        self.buffer[tty][length] = c;
+        self.length[tty] += 1;
 
         vga::putc(c);
     }
 
     pub fn backspace(&mut self) {
-        if self.length == 0 {
+        let tty = self.current_tty;
+
+        if self.length[tty] == 0 {
             return;
         }
 
-        self.length -= 1;
-        self.buffer[self.length] = 0;
+        self.length[tty] -= 1;
+
+        let length = self.length[tty];
+
+        self.buffer[tty][length] = 0;
 
         vga::backspace();
     }
 
     pub fn enter(&mut self) {
+        let tty = self.current_tty;
+        let length = self.length[tty];
+
         vga::putc(b'\n');
 
-        if let Ok(command) = core::str::from_utf8(&self.buffer[..self.length]) {
+        if let Ok(command) = core::str::from_utf8(&self.buffer[tty][..length]) {
             execute_cmd(command);
         }
 
@@ -103,8 +105,10 @@ impl Shell {
     }
 
     fn clear(&mut self) {
-        self.buffer = [0; MAX_COMMAND];
-        self.length = 0;
+        let tty = self.current_tty;
+
+        self.buffer[tty] = [0; MAX_LEN_SHELL];
+        self.length[tty] = 0;
     }
 }
 
@@ -119,10 +123,7 @@ pub fn init() {
 pub fn handle_keyboard() {
     while let Some(event) = keyboard::get_key() {
         unsafe {
-            (&raw mut SHELL)
-                .as_mut()
-                .unwrap()
-                .handle_key(event);
+            (&raw mut SHELL).as_mut().unwrap().handle_key(event);
         }
     }
 }
@@ -130,6 +131,9 @@ pub fn handle_keyboard() {
 #[allow(dead_code)]
 pub fn command_halt() {
     println!("System halted.");
+
+    vga::disable_cursor();
+
     unsafe {
         loop {
             asm!("cli; hlt");
@@ -140,17 +144,19 @@ pub fn command_halt() {
 #[allow(dead_code)]
 pub fn command_reboot() {
     let mut good: u8 = 0x02;
+
     while (good & 0x02) == 0x02 {
         good = inb(0x64);
     }
+
     outb(0x64, 0xFE);
+
     unsafe {
         loop {
             asm!("cli; hlt");
         }
     }
 }
-
 
 pub fn execute_cmd(command: &str) {
     match command {

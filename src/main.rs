@@ -76,7 +76,7 @@ pub extern "C" fn kernel_main() -> ! {
     keyboard::init();
 
     print_boot_screen();
-    
+
     shell::init();
 
     idt::enable_interrupts();
