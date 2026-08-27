@@ -8,6 +8,7 @@ use crate::ports;
 const VGA_BUFFER: *mut u16 = 0xb8000 as *mut u16;
 const WIDTH: usize = 80;
 const HEIGHT: usize = 25;
+
 pub const MAX_TERMINALS: usize = 6;
 
 static ACTIVE_TERMINAL: AtomicU8 = AtomicU8::new(0);
@@ -34,63 +35,9 @@ pub enum Color {
     White = 15,
 }
 
-pub fn save_tty(terminal: &mut Writer) {
-    for (row, history_row) in terminal.id.history.iter_mut().enumerate() {
-        for (col, cell) in history_row.iter_mut().enumerate() {
-            *cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
-        }
-    }
-}
-
-pub fn restore_tty(terminal: &mut Writer) {
-    for (row, history_row) in terminal.id.history.iter().enumerate() {
-        for (col, &cell) in history_row.iter().enumerate() {
-            unsafe {
-                write_volatile(VGA_BUFFER.add(row * WIDTH + col), cell);
-            }
-        }
-    }
-}
-
-pub fn switch_terminal(tty_id: u8) {
-    if tty_id >= MAX_TERMINALS as u8 {
-        return;
-    }
-
-    let prev_terminal = TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
-        .0
-        .get();
-
-    unsafe {
-        save_tty(&mut *prev_terminal);
-    }
-
-    ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
-
-    let terminal = TERMINAL[tty_id as usize].0.get();
-
-    unsafe {
-        restore_tty(&mut *terminal);
-        (*terminal).update_cursor();
-    }
-}
-
 const fn entry(c: u8, fg: Color, bg: Color) -> u16 {
     let attr = (fg as u8) | ((bg as u8) << 4);
     (c as u16) | ((attr as u16) << 8)
-}
-
-pub fn init() {
-    for (n, tty) in (1_u8..).zip(TERMINAL.iter().take(MAX_TERMINALS)) {
-        let terminal = tty.0.get();
-
-        unsafe {
-            (*terminal).clear_screen(Color::Black);
-            (*terminal).enable_cursor(14, 15);
-            (*terminal).update_cursor();
-            (*terminal).id.name = n;
-        }
-    }
 }
 
 pub struct InfoTty {
@@ -108,7 +55,7 @@ pub struct Writer {
 
 impl Writer {
     const fn new() -> Self {
-        Writer {
+        Self {
             row: 0,
             col: 0,
             fg: Color::LightGreen,
@@ -133,6 +80,8 @@ impl Writer {
 
     pub fn clear_screen(&mut self, color: Color) {
         self.bg = color;
+        self.row = 0;
+        self.col = 0;
 
         for y in 0..HEIGHT {
             for x in 0..WIDTH {
@@ -141,26 +90,24 @@ impl Writer {
                 }
             }
         }
+
+        self.update_cursor();
     }
 
     pub fn enable_cursor(&mut self, start: u8, end: u8) {
         ports::outb(0x3D4, 0x0A);
         ports::outb(0x3D5, (ports::inb(0x3D5) & 0xC0) | start);
+
         ports::outb(0x3D4, 0x0B);
         ports::outb(0x3D5, (ports::inb(0x3D5) & 0xE0) | end);
     }
 
-    #[allow(dead_code)]
-    pub fn disable_cursor(&mut self) {
-        ports::outb(0x3D4, 0x0A);
-        ports::outb(0x3D5, 0x20);
-    }
-
     pub fn update_cursor(&mut self) {
-        let pos: u16 = (self.row * WIDTH + self.col) as u16;
+        let pos = (self.row * WIDTH + self.col) as u16;
 
         ports::outb(0x3D4, 0x0F);
         ports::outb(0x3D5, pos as u8);
+
         ports::outb(0x3D4, 0x0E);
         ports::outb(0x3D5, (pos >> 8) as u8);
     }
@@ -177,10 +124,18 @@ impl Writer {
         }
 
         for col in 0..WIDTH {
-            self.put_at(HEIGHT - 1, col, b' ');
+            unsafe {
+                write_volatile(
+                    VGA_BUFFER.add((HEIGHT - 1) * WIDTH + col),
+                    entry(b' ', self.fg, self.bg),
+                );
+            }
         }
 
         self.row = HEIGHT - 1;
+        self.col = 0;
+
+        self.update_cursor();
     }
 
     fn newline(&mut self) {
@@ -197,7 +152,14 @@ impl Writer {
 
     pub fn write_byte(&mut self, b: u8) {
         match b {
-            b'\n' => self.newline(),
+            b'\n' => {
+                self.newline();
+            }
+
+            0x08 => {
+                self.backspace();
+            }
+
             byte => {
                 if self.col >= WIDTH {
                     self.newline();
@@ -205,9 +167,30 @@ impl Writer {
 
                 self.put_at(self.row, self.col, byte);
                 self.col += 1;
+
                 self.update_cursor();
             }
         }
+    }
+
+    pub fn backspace(&mut self) {
+        if self.col > 0 {
+            self.col -= 1;
+        } else if self.row > 0 {
+            self.row -= 1;
+            self.col = WIDTH - 1;
+        } else {
+            return;
+        }
+
+        unsafe {
+            write_volatile(
+                VGA_BUFFER.add(self.row * WIDTH + self.col),
+                entry(b' ', self.fg, self.bg),
+            );
+        }
+
+        self.update_cursor();
     }
 }
 
@@ -219,6 +202,12 @@ impl fmt::Write for Writer {
 
         Ok(())
     }
+}
+
+#[allow(dead_code)]
+pub fn disable_cursor() {
+    ports::outb(0x3D4, 0x0A);
+    ports::outb(0x3D5, 0x20);
 }
 
 struct Terminal(UnsafeCell<Writer>);
@@ -234,35 +223,118 @@ static TERMINAL: [Terminal; MAX_TERMINALS] = [
     Terminal(UnsafeCell::new(Writer::new())),
 ];
 
+pub fn save_tty(terminal: &mut Writer) {
+    for (row, history_row) in terminal.id.history.iter_mut().enumerate() {
+        for (col, cell) in history_row.iter_mut().enumerate() {
+            *cell = unsafe { read_volatile(VGA_BUFFER.add(row * WIDTH + col)) };
+        }
+    }
+}
+
+pub fn restore_tty(terminal: &Writer) {
+    for (row, history_row) in terminal.id.history.iter().enumerate() {
+        for (col, &cell) in history_row.iter().enumerate() {
+            unsafe {
+                write_volatile(VGA_BUFFER.add(row * WIDTH + col), cell);
+            }
+        }
+    }
+}
+
+pub fn switch_terminal(tty_id: u8) {
+    if tty_id >= MAX_TERMINALS as u8 {
+        return;
+    }
+
+    let current_id = ACTIVE_TERMINAL.load(Ordering::Relaxed);
+
+    if current_id == tty_id {
+        return;
+    }
+
+    let previous_terminal = TERMINAL[current_id as usize].0.get();
+
+    unsafe {
+        save_tty(&mut *previous_terminal);
+    }
+
+    ACTIVE_TERMINAL.store(tty_id, Ordering::Relaxed);
+
+    let new_terminal = TERMINAL[tty_id as usize].0.get();
+
+    unsafe {
+        restore_tty(&*new_terminal);
+        (*new_terminal).update_cursor();
+    }
+}
+
+pub fn init() {
+    for (n, tty) in (0_u8..).zip(TERMINAL.iter().take(MAX_TERMINALS)) {
+        let terminal = tty.0.get();
+
+        unsafe {
+            (*terminal).clear_screen(Color::Black);
+            (*terminal).enable_cursor(14, 15);
+            (*terminal).id.name = n;
+        }
+    }
+
+    ACTIVE_TERMINAL.store(0, Ordering::Relaxed);
+
+    let terminal = TERMINAL[0].0.get();
+
+    unsafe {
+        (*terminal).update_cursor();
+    }
+}
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
 
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+
     unsafe {
-        (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
-            .0
-            .get())
-        .write_fmt(args)
-        .unwrap();
+        (*TERMINAL[active].0.get()).write_fmt(args).unwrap();
     }
 }
 
 pub fn putc(c: u8) {
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+
     unsafe {
-        (*TERMINAL[ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize]
-            .0
-            .get())
-        .write_byte(c);
-    };
+        (*TERMINAL[active].0.get()).write_byte(c);
+    }
+}
+
+pub fn backspace() {
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+
+    unsafe {
+        (*TERMINAL[active].0.get()).backspace();
+    }
 }
 
 #[macro_export]
 macro_rules! println {
-    () => ($crate::drivers::vga::_print(format_args!("\n")));
-    ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!("{}\n", format_args!($($arg)*))));
+    () => {
+        $crate::drivers::vga::_print(
+            format_args!("\n"),
+        )
+    };
+
+    ($($arg:tt)*) => {
+        $crate::drivers::vga::_print(
+            format_args!("{}\n", format_args!($($arg)*)),
+        )
+    };
 }
 
 #[macro_export]
 macro_rules! print {
-    ($($arg:tt)*) => ($crate::drivers::vga::_print(format_args!($($arg)*)));
+    ($($arg:tt)*) => {
+        $crate::drivers::vga::_print(
+            format_args!($($arg)*),
+        )
+    };
 }
