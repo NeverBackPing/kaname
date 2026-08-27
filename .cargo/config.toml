@@ -6,7 +6,6 @@ target = ".cargo/i686-kfs.json"
 [target.i686-kfs]
 linker = "rust-lld"
 rustflags = ["-C", "link-arg=-Tlinker.ld"]
-runner = "qemu-system-i386 -serial stdio -kernel"
 
 [unstable]
 build-std = ["core", "alloc"]

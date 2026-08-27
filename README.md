@@ -18,16 +18,16 @@ The name Kaname (要) stands for "essence" / "main point" in Japanese, it is mea
 - PS/2 keyboard driver (US QWERTY, ring buffer)
 - IDT setup
 - GDT setup
+- Virtual terminals
 
 ### Working on
 
-- Virtual terminals
+- Tiny interactive shell
 
 ### Planned
 
 - 8253 PIT clock
 - Kernel stack trace
-- Tiny interactive shell
 - Memory paging & allocator
 - Kernel & user space
 - Kernel panics
