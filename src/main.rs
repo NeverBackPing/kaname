@@ -74,11 +74,13 @@ pub extern "C" fn kernel_main() -> ! {
     idt::init();
     pic::init();
     keyboard::init();
+    shell::init();
 
     print_boot_screen();
 
     idt::enable_interrupts();
     loop {
+        shell::handle_keyboard();
         if let Some(event) = keyboard::get_key() {
             if let Key::Function(fn_key) = event.key {
                 drivers::vga::switch_terminal(fn_key);
