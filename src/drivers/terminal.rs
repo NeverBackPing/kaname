@@ -131,8 +131,8 @@ impl Terminal {
 
     pub fn clear(&mut self) {
         let blank = vga::entry(b' ', self.fg, self.bg);
-        for i in 0..BUF_SIZE {
-            self.buffer[i] = blank;
+        for cell in self.buffer.iter_mut() {
+            *cell = blank;
         }
         self.cursor_row = 0;
         self.cursor_col = 0;
