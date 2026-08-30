@@ -10,6 +10,7 @@ pub const SCROLLBACK: usize = 200;
 const BUF_SIZE: usize = COLS * SCROLLBACK;
 
 pub const MAX_TTYS: usize = 7;
+pub const LOG_TTY: usize = 6;
 
 static ACTIVE_TTY: AtomicU8 = AtomicU8::new(0);
 
@@ -311,7 +312,7 @@ pub fn _print(args: fmt::Arguments) {
 pub fn _log(args: fmt::Arguments) {
     use fmt::Write;
 
-    let term = unsafe { &mut *TTYS[6].0.get() };
+    let term = unsafe { &mut *TTYS[LOG_TTY].0.get() };
     term.write_fmt(args).unwrap();
 }
 

@@ -30,6 +30,15 @@ impl Shell {
     }
 
     pub fn handle_key(&mut self, event: KeyEvent) {
+        if self.current_tty == terminal::LOG_TTY {
+            match event.key {
+                Key::Function(f) => self.switch_tty(f as usize),
+                Key::Nav(NavKey::PageUp) => terminal::scroll_up(),
+                Key::Nav(NavKey::PageDown) => terminal::scroll_down(),
+                _ => {}
+            }
+            return;
+        }
         match event.key {
             Key::Char(b'\n') => {
                 self.enter();
