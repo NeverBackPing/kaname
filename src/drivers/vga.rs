@@ -150,6 +150,16 @@ impl Writer {
         self.update_cursor();
     }
 
+    pub fn write_raw(&mut self, b: u8) {
+        if self.col >= WIDTH {
+            self.newline();
+        }
+        self.put_at(self.row, self.col, b);
+        self.col += 1;
+
+        self.update_cursor();
+    }
+
     pub fn write_byte(&mut self, b: u8) {
         match b {
             b'\n' => {
@@ -161,14 +171,7 @@ impl Writer {
             }
 
             byte => {
-                if self.col >= WIDTH {
-                    self.newline();
-                }
-
-                self.put_at(self.row, self.col, byte);
-                self.col += 1;
-
-                self.update_cursor();
+                self.write_raw(byte);
             }
         }
     }
@@ -296,6 +299,7 @@ pub fn init() {
     get_active_terminal().update_cursor();
 }
 
+
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
@@ -315,9 +319,8 @@ pub fn putc(c: u8) {
     get_active_terminal().write_byte(c);
 }
 
-    unsafe {
-        (*TERMINAL[active].0.get()).write_byte(c);
-    }
+pub fn put_raw(c: u8) {
+    get_active_terminal().write_raw(c);
 }
 
 pub fn backspace() {
