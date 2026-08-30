@@ -1,9 +1,9 @@
 use crate::drivers::keyboard::{self, Key, KeyEvent};
-use crate::drivers::vga::{self, *};
+use crate::drivers::vga::{self, MAX_TERMINALS};
 use core::arch::asm;
 
 use crate::boot::{STACK, STACK_SIZE, Stack};
-use crate::ports::{inb, outb};
+use crate::ports;
 use crate::{print, println};
 
 const MAX_LEN_SHELL: usize = 64;
@@ -24,8 +24,7 @@ impl Shell {
     }
 
     pub fn init(&mut self) {
-        vga::putc(b'>');
-        vga::putc(b' ');
+        print!("> ");
     }
 
     pub fn handle_key(&mut self, event: KeyEvent) {
@@ -101,8 +100,7 @@ impl Shell {
 
         self.clear();
 
-        vga::putc(b'>');
-        vga::putc(b' ');
+        print!("> ");
     }
 
     fn clear(&mut self) {
@@ -129,8 +127,7 @@ pub fn handle_keyboard() {
     }
 }
 
-#[allow(dead_code)]
-pub fn command_halt() {
+fn command_halt() {
     println!("System halted.");
 
     vga::disable_cursor();
@@ -142,15 +139,14 @@ pub fn command_halt() {
     }
 }
 
-#[allow(dead_code)]
-pub fn command_reboot() {
+fn command_reboot() {
     let mut good: u8 = 0x02;
 
     while (good & 0x02) == 0x02 {
-        good = inb(0x64);
+        good = ports::inb(0x64);
     }
 
-    outb(0x64, 0xFE);
+    ports::outb(0x64, 0xFE);
 
     unsafe {
         loop {
@@ -159,11 +155,53 @@ pub fn command_reboot() {
     }
 }
 
-pub fn execute_cmd(command: &str) {
+// Since an ACPI parser is not in the scope of this project, we just call the emulator-specific
+// shutdown methods
+fn command_shutdown() {
+    // QEMU 2.0+
+    ports::outw(0x604, 0x2000);
+    // Bochs and older QEMU
+    ports::outw(0xB004, 0x2000);
+    // Virtualbox
+    ports::outw(0x4004, 0x3400);
+    // Cloud Hypervisor
+    ports::outw(0x600, 0x34);
+    // Did not work, halt
+    panic!("Shutdown failed");
+}
+
+fn command_help_vga() {
+    println!("Code Page 437 characters: ");
+    println!();
+    for i in 0..4u8 {
+        for j in 0..64u8 {
+            let c = i * 64u8 + j;
+            vga::put_raw(c);
+        }
+        println!();
+    }
+    println!();
+}
+
+fn command_help() {
+    println!("halt        - Halt the machine");
+    println!("reboot      - Reboot the machine");
+    println!("stack       - Print kernel stack");
+    println!("clear       - Clear screen");
+    println!("shutdown    - Shutdown system");
+    println!("help        - Print this help message");
+    println!("help vga    - Code Page 437 characters");
+}
+
+fn execute_cmd(command: &str) {
     match command {
         "halt" => command_halt(),
         "reboot" => command_reboot(),
         "stack" => command_stack(),
+        "clear" => command_clear(),
+        "shutdown" => command_shutdown(),
+        "help" => command_help(),
+        "help vga" => command_help_vga(),
         "" => {}
 
         _ => println!("Unknown command: {}", command),
@@ -173,8 +211,11 @@ pub fn execute_cmd(command: &str) {
 const BYTES_PER_LINE: usize = 16;
 const MAX_LINES: usize = 32;
 
-#[allow(dead_code)]
-pub fn command_stack() {
+fn command_clear() {
+    vga::clear();
+}
+
+fn command_stack() {
     let esp: usize;
 
     unsafe {
