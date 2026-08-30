@@ -19,19 +19,19 @@ The name Kaname (要) stands for "essence" / "main point" in Japanese, it is mea
 - IDT setup
 - GDT setup
 - Virtual terminals
+- Tiny interactive shell
 
 ### Working on
 
-- Tiny interactive shell
+- Memory paging & allocator
+- Memory dumping and debug
+- Kernel stack trace
+- Kernel & user space
+- Kernel panics
 
 ### Planned
 
 - 8253 PIT clock
-- Kernel stack trace
-- Memory paging & allocator
-- Kernel & user space
-- Kernel panics
-- Memory dumping and debug
 - Single-callback Kernel API
 - Signal scheduler
 
