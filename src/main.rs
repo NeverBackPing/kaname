@@ -15,6 +15,7 @@ mod shell;
 
 use drivers::{
     keyboard::{self, Key},
+    terminal::{self, Color},
     vga,
 };
 
@@ -56,9 +57,9 @@ fn print_boot_screen() {
 
 #[unsafe(no_mangle)]
 pub extern "C" fn kernel_main() -> ! {
-    vga::init();
     gdt::init();
     idt::init();
+    terminal::init();
     pic::init();
     keyboard::init();
 
@@ -67,11 +68,14 @@ pub extern "C" fn kernel_main() -> ! {
     shell::init();
 
     idt::enable_interrupts();
+
+    log!("[boot] init complete");
+
     loop {
         shell::handle_keyboard();
         if let Some(event) = keyboard::get_key() {
             if let Key::Function(fn_key) = event.key {
-                vga::switch_terminal(fn_key);
+                terminal::switch_to(fn_key);
             } else if let Key::Char(c) = event.key {
                 print!("{}", c as char);
             }
@@ -84,7 +88,7 @@ pub extern "C" fn kernel_main() -> ! {
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    vga::set_color(vga::Color::Red);
+    terminal::set_color(Color::Red, Color::White);
     println!("{}", info);
     vga::disable_cursor();
     println!("System halted.");
