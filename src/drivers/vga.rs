@@ -278,9 +278,7 @@ pub fn switch_terminal(tty_id: u8) {
 fn get_active_terminal() -> &'static mut Writer {
     let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
 
-    unsafe {
-        &mut *TERMINAL[active].0.get()
-    }
+    unsafe { &mut *TERMINAL[active].0.get() }
 }
 
 pub fn init() {
@@ -298,7 +296,6 @@ pub fn init() {
 
     get_active_terminal().update_cursor();
 }
-
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {

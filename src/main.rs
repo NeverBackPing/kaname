@@ -13,7 +13,10 @@ mod pic;
 mod ports;
 mod shell;
 
-use drivers::{keyboard::{self, Key}, vga};
+use drivers::{
+    keyboard::{self, Key},
+    vga,
+};
 
 const BOOT_SCREEN: &[&str] = &[
     "================================================================================",
