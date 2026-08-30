@@ -1,9 +1,9 @@
 use crate::drivers::keyboard::{self, Key, KeyEvent};
-use crate::drivers::vga::{self, *};
+use crate::drivers::vga::{self, MAX_TERMINALS};
 use core::arch::asm;
 
 use crate::boot::{STACK, STACK_SIZE, Stack};
-use crate::ports::{inb, outb};
+use crate::ports;
 use crate::{print, println};
 
 const MAX_LEN_SHELL: usize = 64;
@@ -24,8 +24,7 @@ impl Shell {
     }
 
     pub fn init(&mut self) {
-        vga::putc(b'>');
-        vga::putc(b' ');
+        print!("> ");
     }
 
     pub fn handle_key(&mut self, event: KeyEvent) {
@@ -101,8 +100,7 @@ impl Shell {
 
         self.clear();
 
-        vga::putc(b'>');
-        vga::putc(b' ');
+        print!("> ");
     }
 
     fn clear(&mut self) {
@@ -129,8 +127,7 @@ pub fn handle_keyboard() {
     }
 }
 
-#[allow(dead_code)]
-pub fn command_halt() {
+fn command_halt() {
     println!("System halted.");
 
     vga::disable_cursor();
@@ -142,15 +139,14 @@ pub fn command_halt() {
     }
 }
 
-#[allow(dead_code)]
-pub fn command_reboot() {
+fn command_reboot() {
     let mut good: u8 = 0x02;
 
     while (good & 0x02) == 0x02 {
-        good = inb(0x64);
+        good = ports::inb(0x64);
     }
 
-    outb(0x64, 0xFE);
+    ports::outb(0x64, 0xFE);
 
     unsafe {
         loop {

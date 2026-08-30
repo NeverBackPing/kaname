@@ -58,11 +58,11 @@ impl Writer {
         Self {
             row: 0,
             col: 0,
-            fg: Color::LightGreen,
-            bg: Color::Black,
+            fg: Color::Black,
+            bg: Color::LightGrey,
             id: InfoTty {
                 name: 0,
-                history: [[entry(b' ', Color::LightGreen, Color::Black); WIDTH]; HEIGHT],
+                history: [[entry(b' ', Color::Black, Color::LightGrey); WIDTH]; HEIGHT],
             },
         }
     }
@@ -192,12 +192,16 @@ impl Writer {
 
         self.update_cursor();
     }
+
+    pub fn set_color(&mut self, color: Color) {
+        self.fg = color;
+    }
 }
 
 impl fmt::Write for Writer {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        for b in s.bytes() {
-            self.write_byte(b);
+        for c in s.chars() {
+            self.write_byte(super::cp437::encode(c));
         }
 
         Ok(())
@@ -268,12 +272,20 @@ pub fn switch_terminal(tty_id: u8) {
     }
 }
 
+fn get_active_terminal() -> &'static mut Writer {
+    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+
+    unsafe {
+        &mut *TERMINAL[active].0.get()
+    }
+}
+
 pub fn init() {
     for (n, tty) in (0_u8..).zip(TERMINAL.iter().take(MAX_TERMINALS)) {
         let terminal = tty.0.get();
 
         unsafe {
-            (*terminal).clear_screen(Color::Black);
+            (*terminal).clear_screen(Color::LightGrey);
             (*terminal).enable_cursor(14, 15);
             (*terminal).id.name = n;
         }
@@ -281,26 +293,27 @@ pub fn init() {
 
     ACTIVE_TERMINAL.store(0, Ordering::Relaxed);
 
-    let terminal = TERMINAL[0].0.get();
-
-    unsafe {
-        (*terminal).update_cursor();
-    }
+    get_active_terminal().update_cursor();
 }
 
 #[doc(hidden)]
 pub fn _print(args: fmt::Arguments) {
     use fmt::Write;
 
-    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+    get_active_terminal().write_fmt(args).unwrap();
+}
 
-    unsafe {
-        (*TERMINAL[active].0.get()).write_fmt(args).unwrap();
-    }
+pub fn clear() {
+    get_active_terminal().clear_screen(Color::LightGrey);
+}
+
+pub fn set_color(color: Color) {
+    get_active_terminal().set_color(color);
 }
 
 pub fn putc(c: u8) {
-    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
+    get_active_terminal().write_byte(c);
+}
 
     unsafe {
         (*TERMINAL[active].0.get()).write_byte(c);
@@ -308,11 +321,7 @@ pub fn putc(c: u8) {
 }
 
 pub fn backspace() {
-    let active = ACTIVE_TERMINAL.load(Ordering::Relaxed) as usize;
-
-    unsafe {
-        (*TERMINAL[active].0.get()).backspace();
-    }
+    get_active_terminal().backspace();
 }
 
 #[macro_export]
