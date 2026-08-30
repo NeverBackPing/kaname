@@ -155,11 +155,38 @@ fn command_reboot() {
     }
 }
 
-pub fn execute_cmd(command: &str) {
+// Since an ACPI parser is not in the scope of this project, we just call the emulator-specific
+// shutdown methods
+fn command_shutdown() {
+    // QEMU 2.0+
+    ports::outw(0x604, 0x2000);
+    // Bochs and older QEMU
+    ports::outw(0xB004, 0x2000);
+    // Virtualbox
+    ports::outw(0x4004, 0x3400);
+    // Cloud Hypervisor
+    ports::outw(0x600, 0x34);
+    // Did not work, halt
+    panic!("Shutdown failed");
+}
+
+fn command_help() {
+    println!("halt        - Halt the machine");
+    println!("reboot      - Reboot the machine");
+    println!("stack       - Print kernel stack");
+    println!("clear       - Clear screen");
+    println!("shutdown    - Shutdown system");
+    println!("help        - Print this help message");
+}
+
+fn execute_cmd(command: &str) {
     match command {
         "halt" => command_halt(),
         "reboot" => command_reboot(),
         "stack" => command_stack(),
+        "clear" => command_clear(),
+        "shutdown" => command_shutdown(),
+        "help" => command_help(),
         "" => {}
 
         _ => println!("Unknown command: {}", command),
@@ -169,8 +196,11 @@ pub fn execute_cmd(command: &str) {
 const BYTES_PER_LINE: usize = 16;
 const MAX_LINES: usize = 32;
 
-#[allow(dead_code)]
-pub fn command_stack() {
+fn command_clear() {
+    vga::clear();
+}
+
+fn command_stack() {
     let esp: usize;
 
     unsafe {
