@@ -23,11 +23,11 @@ static MODS: AtomicU16 = AtomicU16::new(0);
 #[allow(dead_code)]
 #[derive(Default, Clone, Copy)]
 pub struct KeyModifiers {
-    shift: bool,
-    ctrl: bool,
-    alt: bool,
-    gui: bool,
-    caps_lock: bool,
+    pub shift: bool,
+    pub ctrl: bool,
+    pub alt: bool,
+    pub gui: bool,
+    pub caps_lock: bool,
 }
 
 #[derive(PartialEq, Default, Clone, Copy)]
