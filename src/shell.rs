@@ -170,6 +170,19 @@ fn command_shutdown() {
     panic!("Shutdown failed");
 }
 
+fn command_help_vga() {
+    println!("Code Page 437 characters: ");
+    println!();
+    for i in 0..4u8 {
+        for j in 0..64u8 {
+            let c = i * 64u8 + j;
+            vga::put_raw(c);
+        }
+        println!();
+    }
+    println!();
+}
+
 fn command_help() {
     println!("halt        - Halt the machine");
     println!("reboot      - Reboot the machine");
@@ -177,6 +190,7 @@ fn command_help() {
     println!("clear       - Clear screen");
     println!("shutdown    - Shutdown system");
     println!("help        - Print this help message");
+    println!("help vga    - Code Page 437 characters");
 }
 
 fn execute_cmd(command: &str) {
@@ -187,6 +201,7 @@ fn execute_cmd(command: &str) {
         "clear" => command_clear(),
         "shutdown" => command_shutdown(),
         "help" => command_help(),
+        "help vga" => command_help_vga(),
         "" => {}
 
         _ => println!("Unknown command: {}", command),
