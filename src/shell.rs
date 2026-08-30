@@ -1,5 +1,6 @@
-use crate::drivers::keyboard::{self, Key, KeyEvent};
-use crate::drivers::vga::{self, MAX_TERMINALS};
+use crate::drivers::keyboard::{self, Key, KeyEvent, NavKey};
+use crate::drivers::terminal::{self, Color, MAX_TTYS};
+use crate::drivers::vga;
 use core::arch::asm;
 
 use crate::boot::{STACK, STACK_SIZE, Stack};
@@ -9,25 +10,35 @@ use crate::{print, println};
 const MAX_LEN_SHELL: usize = 64;
 
 pub struct Shell {
-    buffer: [[u8; MAX_LEN_SHELL]; MAX_TERMINALS],
-    length: [usize; MAX_TERMINALS],
+    buffer: [[u8; MAX_LEN_SHELL]; MAX_TTYS],
+    length: [usize; MAX_TTYS],
     current_tty: usize,
 }
 
 impl Shell {
     pub const fn new() -> Self {
         Self {
-            buffer: [[0; MAX_LEN_SHELL]; MAX_TERMINALS],
-            length: [0; MAX_TERMINALS],
+            buffer: [[0; MAX_LEN_SHELL]; MAX_TTYS],
+            length: [0; MAX_TTYS],
             current_tty: 0,
         }
     }
 
     pub fn init(&mut self) {
-        print!("> ");
+        terminal::put_raw(b'>', Color::Red, Color::White);
+        terminal::put_raw(b' ', Color::Red, Color::White);
     }
 
     pub fn handle_key(&mut self, event: KeyEvent) {
+        if self.current_tty == terminal::LOG_TTY {
+            match event.key {
+                Key::Function(f) => self.switch_tty(f as usize),
+                Key::Nav(NavKey::PageUp) => terminal::scroll_up(),
+                Key::Nav(NavKey::PageDown) => terminal::scroll_down(),
+                _ => {}
+            }
+            return;
+        }
         match event.key {
             Key::Char(b'\n') => {
                 self.enter();
@@ -45,17 +56,23 @@ impl Shell {
                 self.switch_tty(f as usize);
             }
 
+            Key::Nav(k) => match k {
+                NavKey::PageUp => terminal::scroll_up(),
+                NavKey::PageDown => terminal::scroll_down(),
+                _ => {}
+            },
+
             _ => {}
         }
     }
 
     fn switch_tty(&mut self, tty: usize) {
-        if tty >= MAX_TERMINALS {
+        if tty >= MAX_TTYS {
             return;
         }
 
         self.current_tty = tty;
-        vga::switch_terminal(tty.try_into().unwrap());
+        terminal::switch_to(tty.try_into().unwrap());
     }
 
     pub fn input_char(&mut self, c: u8) {
@@ -69,7 +86,7 @@ impl Shell {
         self.buffer[tty][length] = c;
         self.length[tty] += 1;
 
-        vga::putc(c);
+        print!("{}", c as char);
     }
 
     pub fn backspace(&mut self) {
@@ -85,14 +102,14 @@ impl Shell {
 
         self.buffer[tty][length] = 0;
 
-        vga::backspace();
+        terminal::backspace();
     }
 
     pub fn enter(&mut self) {
         let tty = self.current_tty;
         let length = self.length[tty];
 
-        vga::putc(b'\n');
+        println!();
 
         if let Ok(command) = core::str::from_utf8(&self.buffer[tty][..length]) {
             execute_cmd(command);
@@ -100,7 +117,8 @@ impl Shell {
 
         self.clear();
 
-        print!("> ");
+        terminal::put_raw(b'>', Color::Red, Color::White);
+        terminal::put_raw(b' ', Color::Red, Color::White);
     }
 
     fn clear(&mut self) {
@@ -170,13 +188,17 @@ fn command_shutdown() {
     panic!("Shutdown failed");
 }
 
+fn command_panic() {
+    panic!("Manual kernel panic");
+}
+
 fn command_help_vga() {
     println!("Code Page 437 characters: ");
     println!();
     for i in 0..4u8 {
         for j in 0..64u8 {
             let c = i * 64u8 + j;
-            vga::put_raw(c);
+            terminal::put_raw(c, Color::Black, Color::White);
         }
         println!();
     }
@@ -189,6 +211,7 @@ fn command_help() {
     println!("stack       - Print kernel stack");
     println!("clear       - Clear screen");
     println!("shutdown    - Shutdown system");
+    println!("panic       - Trigger a manual kernel panic");
     println!("help        - Print this help message");
     println!("help vga    - Code Page 437 characters");
 }
@@ -202,9 +225,14 @@ fn execute_cmd(command: &str) {
         "shutdown" => command_shutdown(),
         "help" => command_help(),
         "help vga" => command_help_vga(),
+        "panic" => command_panic(),
         "" => {}
 
-        _ => println!("Unknown command: {}", command),
+        _ => {
+            terminal::set_color(Color::Red, Color::White);
+            println!("Unknown command: {}", command);
+            terminal::set_color(Color::Black, Color::White);
+        }
     }
 }
 
@@ -212,7 +240,7 @@ const BYTES_PER_LINE: usize = 16;
 const MAX_LINES: usize = 32;
 
 fn command_clear() {
-    vga::clear();
+    terminal::clear();
 }
 
 fn command_stack() {
