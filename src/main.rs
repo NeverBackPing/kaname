@@ -9,10 +9,10 @@ mod drivers;
 mod gdt;
 mod idt;
 mod libk;
+mod memory;
 mod pic;
 mod ports;
 mod shell;
-mod memory;
 
 use drivers::{
     keyboard::{self, Key},

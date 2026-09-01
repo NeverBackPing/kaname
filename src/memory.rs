@@ -1,48 +1,116 @@
+const PAGE_SIZE: usize = 0x1000;
+const ENTRIES: usize = 1024;
+const MAX_PT: usize = 4;
 
+#[derive(Clone, Copy)]
+pub struct PageDirectoryEntry(u32);
+
+impl PageDirectoryEntry {
+    pub const fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn set_address(&mut self, address: u32) {
+        self.0 = (self.0 & 0xFFF) | (address & 0xFFFF_F000);
+    }
+
+    pub fn set_present(&mut self) {
+        self.0 |= 1 << 0;
+    }
+
+    pub fn set_writable(&mut self) {
+        self.0 |= 1 << 1;
+    }
+}
+
+#[derive(Clone, Copy)]
+pub struct PageTableEntry(u32);
 
 #[allow(dead_code)]
-#[derive(Clone, Copy)]
-enum Flags {
-    Present = 0x1,
-    Write   = 0x2,
-    User    = 0x3,
+impl PageTableEntry {
+    pub const fn new() -> Self {
+        Self(0)
+    }
+
+    pub fn set_address(&mut self, address: u32) {
+        self.0 = (self.0 & 0xFFF) | (address & 0xFFFF_F000);
+    }
+
+    pub fn set_present(&mut self) {
+        self.0 |= 1 << 0;
+    }
+
+    pub fn set_writable(&mut self) {
+        self.0 |= 1 << 1;
+    }
+
+    pub fn set_user(&mut self) {
+        self.0 |= 1 << 1;
+    }
 }
 
 #[repr(C, align(4096))]
 pub struct PageDirectory {
-    pub entries: [u32; 1024],
+    pub entries: [PageDirectoryEntry; ENTRIES],
+}
+
+impl PageDirectory {
+    pub const fn new() -> Self {
+        Self {
+            entries: [PageDirectoryEntry::new(); ENTRIES],
+        }
+    }
 }
 
 #[repr(C, align(4096))]
 pub struct PageTable {
-    pub entries: [u32; 1024],
+    pub entries: [PageTableEntry; ENTRIES],
 }
 
-static mut PAGE_DIRECTORY: PageDirectory = PageDirectory {
-    entries: [0; 1024],
-};
+impl PageTable {
+    pub const fn new() -> Self {
+        Self {
+            entries: [PageTableEntry::new(); ENTRIES],
+        }
+    }
+}
 
-static mut PAGE_TABLE: PageTable = PageTable {
-    entries: [0; 1024],
-};
+#[allow(dead_code)]
+static mut PAGE_DIRECTORY: PageDirectory = PageDirectory::new();
+
+static mut PAGE_TABLES: [PageTable; MAX_PT] = [
+    PageTable::new(),
+    PageTable::new(),
+    PageTable::new(),
+    PageTable::new(),
+];
 
 pub fn init_paging() {
     unsafe {
-        let page_directory = &raw mut PAGE_DIRECTORY;
-        let page_table = &raw mut PAGE_TABLE;
+        // Create the Page Directory
+        for table_index in 0..MAX_PT {
+            // Address of the PT
+            let table_address = &raw const PAGE_TABLES[table_index] as u32;
 
-        // Page Directory
-        for i in 0..1024 {
-            (*page_directory).entries[i] = 0x2;
+            // PD → PT
+            PAGE_DIRECTORY.entries[table_index].set_address(table_address);
+
+            PAGE_DIRECTORY.entries[table_index].set_present();
+
+            PAGE_DIRECTORY.entries[table_index].set_writable();
+
+            // Create the PT
+            for page_index in 0..ENTRIES {
+                // Physical address of the page
+                let address = (table_index * ENTRIES * PAGE_SIZE + page_index * PAGE_SIZE) as u32;
+
+                // PT → physical page
+                PAGE_TABLES[table_index].entries[page_index].set_address(address);
+
+                PAGE_TABLES[table_index].entries[page_index].set_present();
+
+                PAGE_TABLES[table_index].entries[page_index].set_writable();
+            }
         }
-
-        // Identity map first 4 MiB
-        for i in 0..1024 {
-            (*page_table).entries[i] = (i as u32 * 0x1000) | Flags::Present as u32 | Flags::Write as u32;
-        }
-
-        // PDE[0] -> PAGE_TABLE
-        (*page_directory).entries[0] =
-            (page_table as *const PageTable as u32) | Flags::Present as u32 | Flags::Write as u32;
     }
 }
