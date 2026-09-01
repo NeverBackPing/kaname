@@ -12,6 +12,7 @@ mod libk;
 mod pic;
 mod ports;
 mod shell;
+mod memory;
 
 use drivers::{
     keyboard::{self, Key},
@@ -60,6 +61,7 @@ pub extern "C" fn kernel_main() -> ! {
     gdt::init();
     idt::init();
     terminal::init();
+    memory::init_paging();
     pic::init();
     keyboard::init();
 
