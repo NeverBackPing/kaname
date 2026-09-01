@@ -100,16 +100,6 @@ pub struct RawTag {
     size: u32,
 }
 
-#[repr(u32)]
-#[derive(Clone)]
-pub enum MmapEntryType {
-    Available = 1,
-    Reserved = 2,
-    AcpiInfo = 3,
-    HibernationReserved = 4,
-    DefectiveRam = 5,
-}
-
 #[repr(C)]
 pub struct MmapEntry {
     pub base_addr: u64,
