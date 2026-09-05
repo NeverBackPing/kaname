@@ -344,7 +344,7 @@ macro_rules! print {
 macro_rules! log {
     ($($arg:tt)*) => {
         $crate::drivers::terminal::_log(
-            format_args!($($arg)*),
+            format_args!("{}\n", format_args!($($arg)*)),
         )
     };
 }
