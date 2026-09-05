@@ -3,7 +3,7 @@ use crate::drivers::terminal::{self, Color, MAX_TTYS};
 use crate::drivers::vga;
 use core::arch::asm;
 
-use crate::boot::{STACK, STACK_SIZE, Stack};
+use crate::boot::{STACK, STACK_SIZE};
 use crate::ports;
 use crate::{print, println};
 
@@ -24,7 +24,7 @@ impl Shell {
         }
     }
 
-    pub fn init(&mut self) {
+    pub fn init(&self) {
         terminal::put_raw(b'>', Color::Red, Color::White);
         terminal::put_raw(b' ', Color::Red, Color::White);
     }
@@ -192,8 +192,67 @@ fn command_panic() {
     panic!("Manual kernel panic");
 }
 
+fn command_help_memory() {
+    println!("                          [Figure: Page Translation]                          ");
+    println!("                                                                              ");
+    println!("             ╓31           24╥23           16╥15            8╥7             0╖");
+    println!("   linear  → ╟─┬─┬─┬─┬─┬─┬─┬─╫─┬─┬─┬─┬─┬─┬─┬─╫─┬─┬─┬─┬─┬─┬─┬─╫─┬─┬─┬─┬─┬─┬─┬─╢");
+    println!("   address   ╟─┴─┴─┴─┴─┴─┴─┴─╨─┴─┼─┴─┴─┴─┴─┴─╨─┴─┴─┴─┼─┴─┴─┴─╨─┴─┴─┴─┴─┴─┴─┴─╢");
+    println!("             │  Directory index  │    Table index    │        Offset         │");
+    println!("             └┬──────────────────┴┬──────────────────┴───────┬───────────────┘");
+    println!("              │                   │                          │                ");
+    println!(" CR3 ──────┬───→╔Page═Dir═════╗ ┌──→╔Page═Table═══╗          │ ╔RAM══════════╗");
+    println!(" physical  │  │ ║1024 entries ║ │ │ ║1024 entries ║          │ ║     ...     ║");
+    println!("           │  │ ╠═════════════╣ │ │ ╠═════════════╣          │ ║     ...     ║");
+    println!("           │  │ ║     ...     ║ │ │ ║     ...     ║          │ ╟─────────────╢");
+    println!("           │  │ ║     ...     ║ │ │ ║     ...     ║ ┌─────────→║Page Frame   ║");
+    println!("           │  │ ╟─────────────╢ │ │ ║     ...     ║ │        └→║(4096 bytes) ║");
+    println!("           │  └→║ entry (PDE) ╟─┘ │ ║     ...     ║ │          ╟─────────────╢");
+    println!("           │    ╟─────────────╢   │ ╟─────────────╢ │   ┌─────→║Page Frame   ║");
+    println!("           │    ║     ...     ║   │ ║ other entry ╟─│───┘      ╟─────────────╢");
+    println!("         linear ║     ...     ║   │ ╟─────────────╢ │          ║     ...     ║");
+    println!("           │    ║     ...     ║   └→║ entry (PTE) ╟─┘          ║     ...     ║");
+    println!("           │    ╟─────────────╢     ╟─────────────╢            ║     ...     ║");
+    println!("           │    ║  PDE[1023]  ║     ║     ...     ║            ║     ...     ║");
+    println!("           │    ║  recursive  ║     ║     ...     ║            ║     ...     ║");
+    println!("           └────╢   mapping   ║     ║     ...     ║            ║     ...     ║");
+    println!("                ╚═════════════╝     ╚═════════════╝            ╚═════════════╝");
+}
+
+const PALETTE: [Color; 16] = [
+    Color::Black,
+    Color::Blue,
+    Color::Green,
+    Color::Cyan,
+    Color::Red,
+    Color::Magenta,
+    Color::Brown,
+    Color::LightGrey,
+    Color::DarkGrey,
+    Color::LightBlue,
+    Color::LightGreen,
+    Color::LightCyan,
+    Color::LightRed,
+    Color::LightMagenta,
+    Color::Yellow,
+    Color::White,
+];
+
+const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
+
 fn command_help_vga() {
-    println!("Code Page 437 characters: ");
+    for (bg_idx, &bg) in PALETTE.iter().enumerate() {
+        for (fg_idx, &fg) in PALETTE.iter().enumerate() {
+            terminal::put_raw(b' ', fg, bg);
+            terminal::put_raw(HEX_DIGITS[fg_idx], fg, bg);
+            terminal::put_raw(HEX_DIGITS[bg_idx], fg, bg);
+            terminal::put_raw(b' ', fg, bg);
+            terminal::put_raw(b' ', fg, bg);
+        }
+        println!();
+    }
+    println!();
+    println!("Characters: ");
     println!();
     for i in 0..4u8 {
         for j in 0..64u8 {
@@ -213,7 +272,8 @@ fn command_help() {
     println!("shutdown    - Shutdown system");
     println!("panic       - Trigger a manual kernel panic");
     println!("help        - Print this help message");
-    println!("help vga    - Code Page 437 characters");
+    println!("help memory - Linear pointer breakdown");
+    println!("help vga    - Code Page 437 characters and color matrix");
 }
 
 fn execute_cmd(command: &str) {
@@ -223,11 +283,11 @@ fn execute_cmd(command: &str) {
         "stack" => command_stack(),
         "clear" => command_clear(),
         "shutdown" => command_shutdown(),
-        "help" => command_help(),
-        "help vga" => command_help_vga(),
         "panic" => command_panic(),
+        "help" => command_help(),
+        "help memory" => command_help_memory(),
+        "help vga" => command_help_vga(),
         "" => {}
-
         _ => {
             terminal::set_color(Color::Red, Color::White);
             println!("Unknown command: {}", command);
@@ -254,7 +314,7 @@ fn command_stack() {
         );
     }
 
-    let stack_start = &STACK as *const Stack as usize;
+    let stack_start = &raw const STACK as usize;
     let stack_end = stack_start + STACK_SIZE;
 
     let start = esp & !(BYTES_PER_LINE - 1);
