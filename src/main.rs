@@ -1,5 +1,7 @@
 #![no_std]
 #![no_main]
+#![feature(default_field_values)]
+#![allow(dead_code)]
 
 use core::arch::asm;
 use core::panic::PanicInfo;
@@ -9,6 +11,7 @@ mod drivers;
 mod gdt;
 mod idt;
 mod libk;
+mod multiboot2;
 mod memory;
 mod pic;
 mod ports;
@@ -57,7 +60,8 @@ fn print_boot_screen() {
 }
 
 #[unsafe(no_mangle)]
-pub extern "C" fn kernel_main() -> ! {
+#[allow(clippy::missing_safety_doc)]
+pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::Info) -> ! {
     gdt::init();
     idt::init();
     terminal::init();
@@ -72,6 +76,30 @@ pub extern "C" fn kernel_main() -> ! {
     idt::enable_interrupts();
 
     log!("[boot] init complete");
+
+    if let Some(info) = unsafe { info_raw.as_ref() } {
+        for tag in info.tags() {
+            if let multiboot2::Tag::Mmap(tag) = tag {
+                log!("[mmap] tag detected");
+                for entry in tag.entries() {
+                    let type_name = match entry.type_ {
+                        1 => "Available",
+                        2 => "Reserved",
+                        3 => "AcpiInfo",
+                        4 => "HibernationReserved",
+                        5 => "DefectiveRam",
+                        _ => "Unknown",
+                    };
+                    log!(
+                        "[mmap] {:#010X}-{:#010X}  {}",
+                        entry.base_addr,
+                        entry.base_addr + entry.length - 1,
+                        type_name,
+                    );
+                }
+            }
+        }
+    }
 
     loop {
         shell::handle_keyboard();
