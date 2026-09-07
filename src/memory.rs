@@ -194,32 +194,34 @@ pub fn init_paging() {
     }
 }
 
+#[warn(unused)]
+#[allow(dead_code)]
 pub fn test_high_half() {
     const TEST_PHYS: u32 = 0x0100_0000;
     const TEST_VIRT: u32 = 0xE000_0000;
     
     // Écrit une valeur dans la mémoire physique
-    //*(TEST_PHYS as *mut u32) = 0x1234_5678;
+    *(TEST_PHYS as *mut u32) = 0x1234_5678;
     
     
     unsafe {
         // Lit la même mémoire via l'adresse virtuelle
-        //let value = *(TEST_VIRT as *const u32);
+        let value = *(TEST_VIRT as *const u32);
         
         println!("Physical : {:#010X}", TEST_PHYS);
         println!("Virtual  : {:#010X}", TEST_VIRT);
-        //println!("Value    : {:#010X}", value);
+        println!("Value    : {:#010X}", value);
         
-        /*if value == 0x1234_5678 {
+        if value == 0x1234_5678 {
             println!("HIGH HALF MAPPING: OK");
         } 
         else {
             println!("HIGH HALF MAPPING: ERROR");
         }
-        */
     }
 }
 
+#[allow(dead_code)]
 pub fn print_page_tables() {
     unsafe {
 
