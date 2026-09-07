@@ -1,5 +1,5 @@
+use crate::println;
 use core::arch::asm;
-use crate::{print, println};
 
 const PAGE_SIZE: usize = 0x1000;
 const ENTRIES: usize = 1024;
@@ -39,8 +39,8 @@ impl PageTableEntry {
         Self(0)
     }
 
-    pub fn value(&self) -> u32 { 
-        self.0 
+    pub fn value(&self) -> u32 {
+        self.0
     }
 
     pub fn set_address(&mut self, address: u32) {
@@ -99,74 +99,58 @@ static mut PAGE_TABLES: [PageTable; MAX_PT] = [
 
 pub fn init_paging() {
     unsafe {
-        // --------------------------------------------------
-        // Identity mapping : first 16 MiB
-        // --------------------------------------------------
+        let page_tables_ptr = &raw mut PAGE_TABLES;
 
-        for table_index in 0..MAX_PT {
-            let table_address =
-                &raw const PAGE_TABLES[table_index] as u32;
+        let tables_slice =
+            core::slice::from_raw_parts_mut(page_tables_ptr as *mut PageTable, MAX_PT);
 
-            PAGE_DIRECTORY.entries[table_index]
-                .set_address(table_address);
+        for (table_index, table) in tables_slice.iter_mut().take(4).enumerate() {
+            let table_address = table as *const PageTable as u32;
 
-            PAGE_DIRECTORY.entries[table_index]
-                .set_present();
+            PAGE_DIRECTORY.entries[table_index].set_address(table_address);
 
-            PAGE_DIRECTORY.entries[table_index]
-                .set_writable();
+            PAGE_DIRECTORY.entries[table_index].set_present();
 
-            for page_index in 0..ENTRIES {
-                let address =
-                    (table_index * ENTRIES * PAGE_SIZE
-                    + page_index * PAGE_SIZE) as u32;
+            PAGE_DIRECTORY.entries[table_index].set_writable();
 
-                PAGE_TABLES[table_index].entries[page_index]
-                    .set_address(address);
+            for (page_index, entry) in table.entries.iter_mut().enumerate() {
+                let address = (table_index * ENTRIES * PAGE_SIZE + page_index * PAGE_SIZE) as u32;
 
-                PAGE_TABLES[table_index].entries[page_index]
-                    .set_present();
+                entry.set_address(address);
 
-                PAGE_TABLES[table_index].entries[page_index]
-                    .set_writable();
+                entry.set_present();
+
+                entry.set_writable();
             }
         }
 
         // High-half mapping: 0xE0000000 → physical kernel
 
-        const KERNEL_PD_INDEX: usize =
-            (KERNEL_VIRT >> 22) as usize;
+        const KERNEL_PD_INDEX: usize = (KERNEL_VIRT >> 22) as usize;
 
-        // On utilise PAGE_TABLES[3] pour le kernel.
-        let kernel_table_address =
-            &raw const PAGE_TABLES[PT_KERNEL_MEMORY] as u32;
+        //  Kernel PT[4].
+        let kernel_table = &mut tables_slice[PT_KERNEL_MEMORY];
 
-        PAGE_DIRECTORY.entries[KERNEL_PD_INDEX]
-            .set_address(kernel_table_address);
+        let kernel_table_address = kernel_table as *const PageTable as u32;
 
-        PAGE_DIRECTORY.entries[KERNEL_PD_INDEX]
-            .set_present();
+        PAGE_DIRECTORY.entries[KERNEL_PD_INDEX].set_address(kernel_table_address);
 
-        PAGE_DIRECTORY.entries[KERNEL_PD_INDEX]
-            .set_writable();
+        PAGE_DIRECTORY.entries[KERNEL_PD_INDEX].set_present();
 
-        for page_index in 0..ENTRIES {
-            let physical_address =
-                KERNEL_PHYS + (page_index * PAGE_SIZE) as u32;
+        PAGE_DIRECTORY.entries[KERNEL_PD_INDEX].set_writable();
 
-            PAGE_TABLES[PT_KERNEL_MEMORY].entries[page_index]
-                .set_address(physical_address);
+        for (page_index, entry) in kernel_table.entries.iter_mut().enumerate() {
+            let physical_address = KERNEL_PHYS + (page_index * PAGE_SIZE) as u32;
 
-            PAGE_TABLES[PT_KERNEL_MEMORY].entries[page_index]
-                .set_present();
+            entry.set_address(physical_address);
 
-            PAGE_TABLES[PT_KERNEL_MEMORY].entries[page_index]
-                .set_writable();
+            entry.set_present();
+
+            entry.set_writable();
         }
 
         // Load CR3
-        let page_directory_address =
-            &raw const PAGE_DIRECTORY as u32;
+        let page_directory_address = &raw const PAGE_DIRECTORY as u32;
 
         asm!(
             "mov cr3, {0}",
@@ -194,28 +178,24 @@ pub fn init_paging() {
     }
 }
 
-#[warn(unused)]
+#[allow(unused)]
 #[allow(dead_code)]
 pub fn test_high_half() {
     const TEST_PHYS: u32 = 0x0100_0000;
     const TEST_VIRT: u32 = 0xE000_0000;
-    
-    // Écrit une valeur dans la mémoire physique
-    *(TEST_PHYS as *mut u32) = 0x1234_5678;
-    
-    
+
     unsafe {
-        // Lit la même mémoire via l'adresse virtuelle
+        *(TEST_PHYS as *mut u32) = 0x1234_5678;
+
         let value = *(TEST_VIRT as *const u32);
-        
+
         println!("Physical : {:#010X}", TEST_PHYS);
         println!("Virtual  : {:#010X}", TEST_VIRT);
         println!("Value    : {:#010X}", value);
-        
+
         if value == 0x1234_5678 {
             println!("HIGH HALF MAPPING: OK");
-        } 
-        else {
+        } else {
             println!("HIGH HALF MAPPING: ERROR");
         }
     }
@@ -224,42 +204,83 @@ pub fn test_high_half() {
 #[allow(dead_code)]
 pub fn print_page_tables() {
     unsafe {
+        println!("--------- PAGE TABLES ---------");
 
-        for table_index in 0..MAX_PT {
-            println!();
-            println!("--- PAGE TABLE {} ---", table_index);
+        let page_tables_ptr = &raw const PAGE_TABLES;
 
-            for page_index in 0..ENTRIES {
-                let entry = PAGE_TABLES[table_index].entries[page_index];
+        let tables_slice = core::slice::from_raw_parts(page_tables_ptr as *const PageTable, MAX_PT);
 
-                let physical = entry.value();
+        for (table_index, table) in tables_slice.iter().enumerate() {
+            let mut first: Option<(usize, u32)> = None;
+            let mut last: Option<(usize, u32)> = None;
+            let mut count = 0;
 
-                if physical & 1 == 0 {
+            for (page_index, entry) in table.entries.iter().enumerate() {
+                let entry = entry.value();
+
+                if entry & 1 == 0 {
                     continue;
                 }
 
-                let virtual_address =
-                    if table_index == 4 {
-                        // High-half
-                        0xE000_0000
-                            + (page_index * PAGE_SIZE) as u32
-                    } else {
-                        // Identity mapping
-                        (table_index * ENTRIES * PAGE_SIZE
-                            + page_index * PAGE_SIZE) as u32
-                    };
+                count += 1;
 
-                let physical_address =
-                    physical & 0xFFFF_F000;
+                if first.is_none() {
+                    first = Some((page_index, entry));
+                }
+
+                last = Some((page_index, entry));
+            }
+
+            if count == 0 {
+                println!("PT[{}]: empty", table_index);
+                continue;
+            }
+
+            println!("PT[{}]: {} pages", table_index, count);
+
+            if let Some((page_index, entry)) = first {
+                let virtual_address = if table_index < 4 {
+                    (table_index * ENTRIES * PAGE_SIZE + page_index * PAGE_SIZE) as u32
+                } else {
+                    KERNEL_VIRT + (page_index * PAGE_SIZE) as u32
+                };
+
+                let pd_index = (virtual_address >> 22) & 0x3FF;
+
+                let pt_index = (virtual_address >> 12) & 0x3FF;
+
+                let physical_address = entry & 0xFFFF_F000;
 
                 println!(
-                    "{:#010X} -> {:#010X}",
-                    virtual_address,
-                    physical_address
+                    "V:{:#010X} -> PD[{}] -> PT[{}] -> P:{:#010X}",
+                    virtual_address, pd_index, pt_index, physical_address
                 );
             }
+
+            if let Some((page_index, entry)) = last {
+                let virtual_address = if table_index < 4 {
+                    (table_index * ENTRIES * PAGE_SIZE + page_index * PAGE_SIZE) as u32
+                } else {
+                    KERNEL_VIRT + (page_index * PAGE_SIZE) as u32
+                };
+
+                let pd_index = (virtual_address >> 22) & 0x3FF;
+
+                let pt_index = (virtual_address >> 12) & 0x3FF;
+
+                let physical_address = entry & 0xFFFF_F000;
+
+                println!(
+                    "V:{:#010X} -> PD[{}] -> PT[{}] -> P:{:#010X}",
+                    virtual_address, pd_index, pt_index, physical_address
+                );
+            }
+
+            if table_index + 1 != MAX_PT {
+                println!();
+            }
         }
+
+        println!("---------------------------------");
     }
 }
-
-
