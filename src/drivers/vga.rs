@@ -10,7 +10,6 @@ const VGA_MEMORY: *mut u16 = 0xB8000 as *mut u16;
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
-#[allow(dead_code)]
 pub enum Color {
     Black = 0,
     Blue = 1,

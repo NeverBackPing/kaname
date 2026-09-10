@@ -3,7 +3,6 @@ use core::arch::{asm, naked_asm};
 use core::mem::size_of;
 
 #[repr(u8)]
-#[allow(dead_code)]
 enum InterruptVector {
     DivideError,
     Debug,
@@ -37,7 +36,6 @@ const IDT_SIZE: usize = 256;
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
-#[allow(dead_code)]
 enum GateType {
     TaskGate = 0x5,
     Interrupt16 = 0x6,
@@ -211,7 +209,6 @@ pub fn enable_interrupts() {
     }
 }
 
-#[allow(dead_code)]
 pub fn disable_interrupts() {
     unsafe {
         asm!("cli");

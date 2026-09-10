@@ -57,7 +57,7 @@ static MULTIBOOT_HEADER: Multiboot2Header = Multiboot2Header {
 pub const STACK_SIZE: usize = 16 * 1024;
 
 #[repr(align(16))]
-pub struct Stack(#[allow(dead_code)] [u8; STACK_SIZE]);
+pub struct Stack([u8; STACK_SIZE]);
 
 #[unsafe(link_section = ".bss")]
 pub static STACK: Stack = Stack([0; STACK_SIZE]);
