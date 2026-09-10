@@ -11,6 +11,7 @@ mod drivers;
 mod gdt;
 mod idt;
 mod libk;
+mod memory;
 mod multiboot2;
 mod pic;
 mod ports;
@@ -64,6 +65,7 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
     gdt::init();
     idt::init();
     terminal::init();
+    memory::init_paging();
     pic::init();
     keyboard::init();
 
