@@ -5,6 +5,8 @@ Built as part of the 42 KFS project, it is a project exploring kernel developmen
 
 The name Kaname (要) stands for "essence" / "main point" in Japanese, it is meant to be easy to read and meaningful.
 
+![Démo du kernel](assets/img/Kernel.png)
+
 ---
 
 ## Features
