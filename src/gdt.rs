@@ -2,7 +2,6 @@ use core::arch::asm;
 
 pub const KERNEL_CODE_SEG: u16 = 0x08;
 
-#[allow(dead_code)]
 pub const KERNEL_DATA_SEG: u16 = 0x10;
 
 const GDT_ENTRY_COUNT: usize = 7;
@@ -73,7 +72,6 @@ impl SegmentDescriptor {
         )
     }
 
-    #[allow(dead_code)]
     fn bits(self) -> u64 {
         self.0
     }
