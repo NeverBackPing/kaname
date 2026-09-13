@@ -48,7 +48,6 @@ pub fn init() {
     outb(SLAVE_DATA, 0xFF);
 }
 
-#[allow(dead_code)]
 pub fn set_mask(mut line: u8) {
     let port: u16 = if line < 8 { MASTER_DATA } else { SLAVE_DATA };
     if line >= 8 {
@@ -59,7 +58,6 @@ pub fn set_mask(mut line: u8) {
     outb(port, value);
 }
 
-#[allow(dead_code)]
 pub fn clear_mask(mut line: u8) {
     let port: u16 = if line < 8 { MASTER_DATA } else { SLAVE_DATA };
     if line >= 8 {

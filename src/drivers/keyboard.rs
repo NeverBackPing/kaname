@@ -20,7 +20,6 @@ const CAPS_LOCK: u16 = 1 << 8;
 
 static MODS: AtomicU16 = AtomicU16::new(0);
 
-#[allow(dead_code)]
 #[derive(Default, Clone, Copy)]
 pub struct KeyModifiers {
     pub shift: bool,
@@ -78,7 +77,6 @@ pub enum MediaKey {
     MediaSelect,
 }
 
-#[allow(dead_code)]
 #[derive(Default, Clone, Copy)]
 pub struct KeyEvent {
     pub key: Key,
