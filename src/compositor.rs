@@ -467,16 +467,21 @@ impl Compositor {
                     self.remove_node(other_node_id);
                     self.remove_node(pane_node_id);
                     self.remove_pane(pane_id);
-                    self.render();
-                    return;
+                } else if let Node::Leaf(_) = node.kind {
+                    unreachable!();
                 }
-                unreachable!();
             }
             // Close window
             None => {
+                // Do not close window 0
+                if self.active_window == WindowId(0) {
+                    return;
+                }
                 self.remove_node(pane_node_id);
                 self.remove_pane(pane_id);
                 self.remove_window(self.active_window);
+                // Fallback to window 0
+                self.active_window = WindowId(0);
             }
         }
         self.render();
