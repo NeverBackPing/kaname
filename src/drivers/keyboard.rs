@@ -292,7 +292,7 @@ fn snapshot_mods() -> KeyModifiers {
     }
 }
 
-fn keyboard_handler(_: *mut idt::InterruptFrame) {
+fn keyboard_handler(_: &idt::InterruptFrame) {
     let scancode = ports::inb(DATA_PORT);
 
     // no data
