@@ -3,7 +3,7 @@ use core::arch::{asm, naked_asm};
 use core::mem::size_of;
 
 #[repr(u8)]
-enum InterruptVector {
+pub enum InterruptVector {
     DivideError,
     Debug,
     Nmi,
@@ -33,6 +33,30 @@ enum InterruptVector {
 }
 
 const IDT_SIZE: usize = 256;
+
+pub struct PageFaultError(pub u32);
+
+impl PageFaultError {
+    pub fn violation(&self) -> bool {
+        self.0 & 1 << 0 != 0
+    }
+
+    pub fn write(&self) -> bool {
+        self.0 & 1 << 1 != 0
+    }
+
+    pub fn user(&self) -> bool {
+        self.0 & 1 << 2 != 0
+    }
+
+    pub fn reserved_bit(&self) -> bool {
+        self.0 & 1 << 3 != 0
+    }
+
+    pub fn instr_fetch(&self) -> bool {
+        self.0 & 1 << 4 != 0
+    }
+}
 
 #[repr(u8)]
 #[derive(Clone, Copy)]
@@ -98,7 +122,61 @@ pub struct InterruptFrame {
     eflags: u32,
 }
 
-pub type InterruptHandler = fn(*mut InterruptFrame);
+impl InterruptFrame {
+    pub fn edi(&self) -> u32 {
+        self.edi
+    }
+
+    pub fn esi(&self) -> u32 {
+        self.esi
+    }
+
+    pub fn ebp(&self) -> u32 {
+        self.ebp
+    }
+
+    pub fn esp(&self) -> u32 {
+        self.esp
+    }
+
+    pub fn ebx(&self) -> u32 {
+        self.ebx
+    }
+
+    pub fn edx(&self) -> u32 {
+        self.edx
+    }
+
+    pub fn ecx(&self) -> u32 {
+        self.ecx
+    }
+
+    pub fn eax(&self) -> u32 {
+        self.eax
+    }
+
+    pub fn vector(&self) -> u32 {
+        self.vector
+    }
+
+    pub fn error_code(&self) -> u32 {
+        self.error_code
+    }
+
+    pub fn eip(&self) -> u32 {
+        self.eip
+    }
+
+    pub fn cs(&self) -> u32 {
+        self.cs
+    }
+
+    pub fn eflags(&self) -> u32 {
+        self.eflags
+    }
+}
+
+pub type InterruptHandler = fn(&InterruptFrame);
 
 fn has_error_code(vector: u8) -> bool {
     use InterruptVector::*;
@@ -167,8 +245,11 @@ extern "C" fn isr_common_stub() {
 #[unsafe(no_mangle)]
 extern "C" fn interrupt_dispatch(frame: *mut InterruptFrame) {
     unsafe {
-        if ((*frame).vector as usize) < IDT_SIZE
-            && let Some(handler) = HANDLERS[(*frame).vector as usize]
+        let frame = &*frame;
+        let vector = frame.vector() as usize;
+
+        if vector < IDT_SIZE
+            && let Some(handler) = HANDLERS[vector]
         {
             handler(frame);
         }
