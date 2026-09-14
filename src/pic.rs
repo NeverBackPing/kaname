@@ -1,4 +1,4 @@
-use crate::ports::{inb, outb};
+use crate::ports::{inb, io_wait, outb};
 
 //IO PIC 8259
 const MASTER_CMD: u16 = 0x20;
@@ -8,12 +8,6 @@ const SLAVE_DATA: u16 = 0xA1;
 
 pub const MASTER_PIC: u8 = 0x20; // 32
 pub const SLAVE_PIC: u8 = 0x28; // 40
-
-// Wait for give time
-#[inline(always)]
-fn io_wait() {
-    outb(0x80, 0);
-}
 
 pub fn init() {
     // Init
