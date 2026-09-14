@@ -1,7 +1,7 @@
 use crate::drivers::keyboard::{self, Key, KeyEvent, NavKey};
 use crate::drivers::terminal::{self, Color, MAX_TTYS};
 use crate::drivers::vga;
-use crate::memory::{print_page_tables, test_high_half};
+use crate::memory::test_high_half;
 use core::arch::asm;
 
 use crate::boot::{STACK, STACK_SIZE};
@@ -280,7 +280,6 @@ fn command_help() {
 fn execute_cmd(command: &str) {
     match command {
         "halt" => command_halt(),
-        "pt" => print_page_tables(),
         "pt test" => test_high_half(),
         "reboot" => command_reboot(),
         "stack" => command_stack(),

@@ -9,7 +9,7 @@ PHDRS
 }
 
 SECTIONS {
-  . = 0x800;
+  . = 0x1000;
   .gdt : {
     KEEP(*(.gdt))
   } :gdt
