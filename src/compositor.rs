@@ -230,9 +230,9 @@ impl Compositor {
 
     #[inline]
     fn get_next_node(&mut self) -> NodeId {
-        for i in 0..MAX_NODES {
-            if self.nodes[i].is_none() {
-                self.nodes[i] = Some(NodeEntry {
+        for (i, node) in self.nodes.iter_mut().enumerate() {
+            if node.is_none() {
+                *node = Some(NodeEntry {
                     parent: None,
                     // Sentinel value: should be immediately replaced
                     kind: Node::Leaf(PaneId(usize::MAX)),
@@ -246,8 +246,8 @@ impl Compositor {
 
     #[inline]
     fn get_next_pane(&mut self) -> PaneId {
-        for i in 0..MAX_PANES {
-            if self.panes[i].is_none() {
+        for (i, pane) in self.panes.iter().enumerate() {
+            if pane.is_none() {
                 return PaneId(i);
             }
         }
