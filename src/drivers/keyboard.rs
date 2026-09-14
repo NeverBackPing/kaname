@@ -42,6 +42,7 @@ pub enum Key {
 #[repr(u8)]
 #[derive(PartialEq, Clone, Copy)]
 pub enum NavKey {
+    Escape,
     ArrowUp,
     ArrowDown,
     ArrowLeft,
@@ -130,8 +131,12 @@ static mut RB: RingBuffer = RingBuffer {
     tail: 0,
 };
 
+pub fn get_ringbuffer() -> &'static mut RingBuffer {
+    unsafe { (&raw mut RB).as_mut().unwrap() }
+}
+
 pub fn get_key() -> Option<KeyEvent> {
-    unsafe { (&raw mut RB).as_mut().unwrap().pop() }
+    get_ringbuffer().pop()
 }
 
 pub fn init() {
@@ -372,12 +377,10 @@ fn keyboard_handler(_: *mut idt::InterruptFrame) {
             _ => Key::None,
         };
         if val != Key::None {
-            unsafe {
-                (&raw mut RB).as_mut().unwrap().push(KeyEvent {
-                    key: val,
-                    mods: snapshot_mods(),
-                });
-            }
+            get_ringbuffer().push(KeyEvent {
+                key: val,
+                mods: snapshot_mods(),
+            });
         }
         eoi();
         return;
@@ -397,6 +400,14 @@ fn keyboard_handler(_: *mut idt::InterruptFrame) {
     }
 
     match scancode {
+        0x01 => {
+            get_ringbuffer().push(KeyEvent {
+                key: Key::Nav(NavKey::Escape),
+                mods: snapshot_mods(),
+            });
+            eoi();
+            return;
+        }
         0x2A => {
             press_modifier(SHIFT_LEFT);
             eoi();
@@ -423,22 +434,18 @@ fn keyboard_handler(_: *mut idt::InterruptFrame) {
             return;
         }
         0x3B..=0x44 => {
-            unsafe {
-                (&raw mut RB).as_mut().unwrap().push(KeyEvent {
-                    key: Key::Function(scancode - 0x3B),
-                    mods: snapshot_mods(),
-                });
-            }
+            get_ringbuffer().push(KeyEvent {
+                key: Key::Function(scancode - 0x3B),
+                mods: snapshot_mods(),
+            });
             eoi();
             return;
         }
         0x57 | 0x58 => {
-            unsafe {
-                (&raw mut RB).as_mut().unwrap().push(KeyEvent {
-                    key: Key::Function(scancode - 0x57 + 10),
-                    mods: snapshot_mods(),
-                });
-            }
+            get_ringbuffer().push(KeyEvent {
+                key: Key::Function(scancode - 0x57 + 10),
+                mods: snapshot_mods(),
+            });
             eoi();
             return;
         }
@@ -461,12 +468,10 @@ fn keyboard_handler(_: *mut idt::InterruptFrame) {
         SCANCODE_NORMAL[scancode as usize]
     };
     if c != 0 {
-        unsafe {
-            (&raw mut RB).as_mut().unwrap().push(KeyEvent {
-                key: Key::Char(c),
-                mods: snapshot_mods(),
-            });
-        }
+        get_ringbuffer().push(KeyEvent {
+            key: Key::Char(c),
+            mods: snapshot_mods(),
+        });
     }
     eoi();
 }
