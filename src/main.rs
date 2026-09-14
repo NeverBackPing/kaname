@@ -7,6 +7,7 @@ use core::arch::asm;
 use core::panic::PanicInfo;
 
 mod boot;
+mod compositor;
 mod drivers;
 mod gdt;
 mod idt;
@@ -15,15 +16,13 @@ mod multiboot2;
 mod pic;
 mod ports;
 mod shell;
+mod terminal;
 
-use drivers::{
-    keyboard::{self, Key},
-    terminal::{self, Color},
-    vga,
-};
+use drivers::{keyboard, vga};
 use idt::InterruptFrame;
 
 const BOOT_SCREEN: &[&str] = &[
+    "",
     "================================================================================",
     "                       K F S   -   K E R N E L   B O O T",
     "",
@@ -126,9 +125,9 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
     pic::init();
     keyboard::init();
 
-    print_boot_screen();
+    compositor::init();
 
-    shell::init();
+    print_boot_screen();
 
     idt::register_handler(idt::InterruptVector::PageFault as u8, page_fault_handler);
     idt::enable_interrupts();
@@ -160,14 +159,7 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
     }
 
     loop {
-        shell::handle_keyboard();
-        if let Some(event) = keyboard::get_key() {
-            if let Key::Function(fn_key) = event.key {
-                terminal::switch_to(fn_key);
-            } else if let Key::Char(c) = event.key {
-                print!("{}", c as char);
-            }
-        }
+        compositor::handle_keyboard();
         unsafe {
             asm!("hlt");
         }
@@ -176,7 +168,6 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    terminal::set_color(Color::Red, Color::White);
     idt::disable_interrupts();
     println!("{}", info);
     vga::disable_cursor();
