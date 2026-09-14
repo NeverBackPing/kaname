@@ -36,8 +36,6 @@ pub const fn entry(c: u8, fg: Color, bg: Color) -> u16 {
 
 static mut ROW: usize = 0;
 static mut COL: usize = 0;
-static mut FG: Color = Color::Black;
-static mut BG: Color = Color::White;
 
 #[inline]
 pub fn put_entry_at(entry: u16, x: usize, y: usize) {
@@ -46,30 +44,13 @@ pub fn put_entry_at(entry: u16, x: usize, y: usize) {
     }
 }
 
-fn clear_line(line: usize) {
-    for x in 0..WIDTH {
-        unsafe {
-            put_entry_at(entry(b' ', FG, BG), x, line);
-        }
-    }
-}
-
 pub fn init() {
     unsafe {
         ROW = 0;
         COL = 0;
-        BG = Color::White;
-        FG = Color::Black;
-        clear_screen(FG, BG);
+        clear_screen(Color::Black, Color::White);
         enable_cursor(14, 15);
         update_cursor();
-    }
-}
-
-pub fn set_color(fg: Color, bg: Color) {
-    unsafe {
-        FG = fg;
-        BG = bg;
     }
 }
 
@@ -81,9 +62,10 @@ pub fn set_position(row: usize, col: usize) {
 }
 
 pub fn clear_screen(fg: Color, bg: Color) {
-    set_color(fg, bg);
     for y in 0..HEIGHT {
-        clear_line(y);
+        for x in 0..WIDTH {
+            put_entry_at(entry(b' ', fg, bg), x, y);
+        }
     }
 }
 
@@ -111,14 +93,22 @@ pub fn update_cursor() {
 pub fn disable_blink() {
     // Set 0x3C0 to the index state
     ports::inb(0x3DA);
+    ports::io_wait();
     // Write index 0x10
     ports::outb(0x3C0, 0x10);
+    ports::io_wait();
     let mode = ports::inb(0x3C1);
+    ports::io_wait();
 
     ports::inb(0x3DA);
+    ports::io_wait();
     ports::outb(0x3C0, 0x10);
+    ports::io_wait();
     ports::outb(0x3C0, mode & !0x08);
+    ports::io_wait();
 
     ports::inb(0x3DA);
+    ports::io_wait();
     ports::outb(0x3C0, 0x20);
+    ports::io_wait();
 }
