@@ -90,12 +90,12 @@ fn page_fault_handler(frame: &InterruptFrame) {
 
     panic!(
         "\
-┌── PAGE FAULT ─── Error={:#010X} ─────────────────────────────┐
+┌── PAGE FAULT ─── Error={:#010X} ──────────────────────────┐
 │ {} {} on {:<padding$} │
-│ CR2={:#010X} EIP={:#010X} CS ={:#010X} EFLAGS={:#010X} │
-│ EAX={:#010X} EBX={:#010X} ECX={:#010X}    EDX={:#010X} │
-│ ESI={:#010X} EDI={:#010X} EBP={:#010X}    ESP={:#010X} │
-└────────────────────────────────────────────────────────────────┘",
+│ CR2={:#010X} EIP={:#010X} CS ={:#010X} EFL={:#010X} │
+│ EAX={:#010X} EBX={:#010X} ECX={:#010X} EDX={:#010X} │
+│ ESI={:#010X} EDI={:#010X} EBP={:#010X} ESP={:#010X} │
+└─────────────────────────────────────────────────────────────┘",
         frame.error_code(),
         privilege,
         kind,
@@ -112,7 +112,7 @@ fn page_fault_handler(frame: &InterruptFrame) {
         frame.edi(),
         frame.ebp(),
         frame.esp(),
-        padding = 57 - privilege.len() - kind.len(),
+        padding = 54 - privilege.len() - kind.len(),
     );
 }
 
