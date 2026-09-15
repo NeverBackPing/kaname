@@ -393,6 +393,7 @@ impl Compositor {
                 self.pane_mut(pane_id).term.update_cursor();
             }
         }
+        self.render_separators();
     }
 
     fn split_pane(&mut self, axis: Axis) {
@@ -520,10 +521,11 @@ impl Compositor {
 
     fn touches_active_pane(&self, (x, y): (usize, usize)) -> bool {
         let rect = self.active_pane().rect;
+
         let vertical_edge = (x + 1 == rect.x || x == rect.x + rect.w)
-            && (rect.y - 1..rect.y + rect.h + 1).contains(&y);
+            && (rect.y.saturating_sub(1)..rect.y + rect.h + 1).contains(&y);
         let horizontal_edge = (y + 1 == rect.y || y == rect.y + rect.h)
-            && (rect.x - 1..rect.x + rect.w + 1).contains(&x);
+            && (rect.x.saturating_sub(1)..rect.x + rect.w + 1).contains(&x);
         vertical_edge || horizontal_edge
     }
 
@@ -583,44 +585,8 @@ impl Compositor {
         }
     }
 
-    fn render_segment(&mut self) {}
-
-    fn write_at(&self, c: u8, (x, y): (usize, usize), (fg, bg): (Color, Color)) {
-            vga::put_entry_at(vga::entry(c, fg, bg), x, y);
-    }
-
-    fn render_statusbar(&mut self) {
-        let bg = if self.prefix_armed {
-            Color::Cyan
-        } else {
-            Color::Green
-        };
-        for x in 0..vga::WIDTH {
-            self.write_at(b' ', (x, vga::HEIGHT - 1), (Color::White, bg));
-        }
-
-        let mut cursor = 1;
-        for (i, window) in self.windows.iter().enumerate() {
-            if window.is_none() { continue; }
-
-            let fg = if self.active_window == WindowId(i) {
-                Color::Black
-            } else { Color::White };
-
-            if i <= 8 {
-                self.write_at(b'1' + i as u8, (cursor, vga::HEIGHT - 1), (fg, bg));
-                cursor += 2;
-            } else {
-                self.write_at(b'1', (cursor, vga::HEIGHT - 1), (fg, bg));
-                self.write_at(b'1' - 10 + i as u8, (cursor + 1, vga::HEIGHT - 1), (fg, bg));
-                cursor += 3;
-            }
-        }
-    }
-
-    fn render(&mut self) {
+    fn render_separators(&mut self) {
         let root_id = self.active_window().root;
-        self.render_node(root_id);
         let mut segs: [Option<Segment>; 3] = [None; 3];
         let mut count = 0;
         self.collect_segments(root_id, &mut segs, &mut count);
@@ -664,7 +630,49 @@ impl Compositor {
                 }
             }
         }
+    }
 
+    fn write_at(&self, c: u8, (x, y): (usize, usize), (fg, bg): (Color, Color)) {
+        vga::put_entry_at(vga::entry(c, fg, bg), x, y);
+    }
+
+    fn render_statusbar(&mut self) {
+        let bg = if self.prefix_armed {
+            Color::Cyan
+        } else {
+            Color::Green
+        };
+        for x in 0..vga::WIDTH {
+            self.write_at(b' ', (x, vga::HEIGHT - 1), (Color::White, bg));
+        }
+
+        let mut cursor = 1;
+        for (i, window) in self.windows.iter().enumerate() {
+            if window.is_none() {
+                continue;
+            }
+
+            let fg = if self.active_window == WindowId(i) {
+                Color::Black
+            } else {
+                Color::White
+            };
+
+            if i <= 8 {
+                self.write_at(b'1' + i as u8, (cursor, vga::HEIGHT - 1), (fg, bg));
+                cursor += 2;
+            } else {
+                self.write_at(b'1', (cursor, vga::HEIGHT - 1), (fg, bg));
+                self.write_at(b'1' - 10 + i as u8, (cursor + 1, vga::HEIGHT - 1), (fg, bg));
+                cursor += 3;
+            }
+        }
+    }
+
+    fn render(&mut self) {
+        let root_id = self.active_window().root;
+        self.render_node(root_id);
+        self.render_separators();
         self.render_statusbar();
     }
 
