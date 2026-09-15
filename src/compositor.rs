@@ -585,6 +585,10 @@ impl Compositor {
 
     fn render_segment(&mut self) {}
 
+    fn write_at(&self, c: u8, (x, y): (usize, usize), (fg, bg): (Color, Color)) {
+            vga::put_entry_at(vga::entry(c, fg, bg), x, y);
+    }
+
     fn render_statusbar(&mut self) {
         let bg = if self.prefix_armed {
             Color::Cyan
@@ -592,7 +596,25 @@ impl Compositor {
             Color::Green
         };
         for x in 0..vga::WIDTH {
-            vga::put_entry_at(vga::entry(b' ', Color::White, bg), x, vga::HEIGHT - 1);
+            self.write_at(b' ', (x, vga::HEIGHT - 1), (Color::White, bg));
+        }
+
+        let mut cursor = 1;
+        for (i, window) in self.windows.iter().enumerate() {
+            if window.is_none() { continue; }
+
+            let fg = if self.active_window == WindowId(i) {
+                Color::Black
+            } else { Color::White };
+
+            if i <= 8 {
+                self.write_at(b'1' + i as u8, (cursor, vga::HEIGHT - 1), (fg, bg));
+                cursor += 2;
+            } else {
+                self.write_at(b'1', (cursor, vga::HEIGHT - 1), (fg, bg));
+                self.write_at(b'1' - 10 + i as u8, (cursor + 1, vga::HEIGHT - 1), (fg, bg));
+                cursor += 3;
+            }
         }
     }
 
