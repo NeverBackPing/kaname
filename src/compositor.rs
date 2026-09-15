@@ -482,7 +482,7 @@ impl Compositor {
                 self.remove_pane(pane_id);
                 self.remove_window(self.active_window);
                 // Fallback to window 0
-                self.active_window = WindowId(0);
+                self.switch_window(WindowId(0));
             }
         }
         self.render();
