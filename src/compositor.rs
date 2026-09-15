@@ -390,6 +390,7 @@ impl Compositor {
                     unreachable!()
                 };
                 self.active_window_mut().focused_pane = pane_id;
+                self.pane_mut(pane_id).term.update_cursor();
             }
         }
     }
@@ -651,7 +652,7 @@ impl Compositor {
             Node::Leaf(pane_id) => {
                 let pane = self.pane_mut(pane_id);
                 pane.term.mark_all_dirty();
-            },
+            }
             Node::Split { axis: _, a, b } => {
                 self.mark_node_dirty(a);
                 self.mark_node_dirty(b);

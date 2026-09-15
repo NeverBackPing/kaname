@@ -115,6 +115,10 @@ impl Terminal {
             }
             self.mark_clean();
         }
+        self.update_cursor();
+    }
+
+    pub fn update_cursor(&self) {
         let content_row = self.cursor_row.saturating_sub(self.view_row);
         vga::set_position(self.y + content_row, self.x + self.cursor_col);
         vga::update_cursor();
