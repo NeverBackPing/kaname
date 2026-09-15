@@ -60,7 +60,7 @@ impl Terminal {
         self.mark_all_dirty();
     }
 
-    fn mark_all_dirty(&mut self) {
+    pub fn mark_all_dirty(&mut self) {
         self.dirty_first = 0;
         self.dirty_last = self.height - 1;
     }

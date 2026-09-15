@@ -513,6 +513,7 @@ impl Compositor {
             });
         }
         self.active_window = id;
+        self.mark_dirty();
         self.render();
     }
 
@@ -642,6 +643,25 @@ impl Compositor {
         }
 
         self.render_statusbar();
+    }
+
+    fn mark_node_dirty(&mut self, id: NodeId) {
+        let node = self.node(id);
+        match node.kind {
+            Node::Leaf(pane_id) => {
+                let pane = self.pane_mut(pane_id);
+                pane.term.mark_all_dirty();
+            },
+            Node::Split { axis: _, a, b } => {
+                self.mark_node_dirty(a);
+                self.mark_node_dirty(b);
+            }
+        }
+    }
+
+    fn mark_dirty(&mut self) {
+        let root_id = self.active_window().root;
+        self.mark_node_dirty(root_id);
     }
 
     pub fn handle_keyboard(&mut self) {
