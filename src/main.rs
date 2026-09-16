@@ -7,6 +7,7 @@ use core::arch::asm;
 use core::panic::PanicInfo;
 
 mod boot;
+mod compositor;
 mod drivers;
 mod gdt;
 mod idt;
@@ -15,15 +16,13 @@ mod multiboot2;
 mod pic;
 mod ports;
 mod shell;
+mod terminal;
 
-use drivers::{
-    keyboard::{self, Key},
-    terminal::{self, Color},
-    vga,
-};
+use drivers::{keyboard, vga};
 use idt::InterruptFrame;
 
 const BOOT_SCREEN: &[&str] = &[
+    "",
     "================================================================================",
     "                       K F S   -   K E R N E L   B O O T",
     "",
@@ -91,12 +90,12 @@ fn page_fault_handler(frame: &InterruptFrame) {
 
     panic!(
         "\
-┌── PAGE FAULT ─── Error={:#010X} ─────────────────────────────┐
+┌── PAGE FAULT ─── Error={:#010X} ──────────────────────────┐
 │ {} {} on {:<padding$} │
-│ CR2={:#010X} EIP={:#010X} CS ={:#010X} EFLAGS={:#010X} │
-│ EAX={:#010X} EBX={:#010X} ECX={:#010X}    EDX={:#010X} │
-│ ESI={:#010X} EDI={:#010X} EBP={:#010X}    ESP={:#010X} │
-└────────────────────────────────────────────────────────────────┘",
+│ CR2={:#010X} EIP={:#010X} CS ={:#010X} EFL={:#010X} │
+│ EAX={:#010X} EBX={:#010X} ECX={:#010X} EDX={:#010X} │
+│ ESI={:#010X} EDI={:#010X} EBP={:#010X} ESP={:#010X} │
+└─────────────────────────────────────────────────────────────┘",
         frame.error_code(),
         privilege,
         kind,
@@ -113,7 +112,7 @@ fn page_fault_handler(frame: &InterruptFrame) {
         frame.edi(),
         frame.ebp(),
         frame.esp(),
-        padding = 57 - privilege.len() - kind.len(),
+        padding = 54 - privilege.len() - kind.len(),
     );
 }
 
@@ -126,9 +125,9 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
     pic::init();
     keyboard::init();
 
-    print_boot_screen();
+    compositor::init();
 
-    shell::init();
+    print_boot_screen();
 
     idt::register_handler(idt::InterruptVector::PageFault as u8, page_fault_handler);
     idt::enable_interrupts();
@@ -160,14 +159,7 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
     }
 
     loop {
-        shell::handle_keyboard();
-        if let Some(event) = keyboard::get_key() {
-            if let Key::Function(fn_key) = event.key {
-                terminal::switch_to(fn_key);
-            } else if let Key::Char(c) = event.key {
-                print!("{}", c as char);
-            }
-        }
+        compositor::handle_keyboard();
         unsafe {
             asm!("hlt");
         }
@@ -176,7 +168,6 @@ pub unsafe extern "C" fn kernel_main(_magic: u32, info_raw: *const multiboot2::I
 
 #[panic_handler]
 fn panic(info: &PanicInfo) -> ! {
-    terminal::set_color(Color::Red, Color::White);
     idt::disable_interrupts();
     println!("{}", info);
     vga::disable_cursor();

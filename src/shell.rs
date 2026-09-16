@@ -1,149 +1,10 @@
-use crate::drivers::keyboard::{self, Key, KeyEvent, NavKey};
-use crate::drivers::terminal::{self, Color, MAX_TTYS};
 use crate::drivers::vga;
+use crate::terminal::Color;
 use core::arch::asm;
 
 use crate::boot::{STACK, STACK_SIZE};
-use crate::ports;
+use crate::{compositor, ports};
 use crate::{print, println};
-
-const MAX_LEN_SHELL: usize = 64;
-
-pub struct Shell {
-    buffer: [[u8; MAX_LEN_SHELL]; MAX_TTYS],
-    length: [usize; MAX_TTYS],
-    current_tty: usize,
-}
-
-impl Shell {
-    pub const fn new() -> Self {
-        Self {
-            buffer: [[0; MAX_LEN_SHELL]; MAX_TTYS],
-            length: [0; MAX_TTYS],
-            current_tty: 0,
-        }
-    }
-
-    pub fn init(&self) {
-        terminal::put_raw(b'>', Color::Red, Color::White);
-        terminal::put_raw(b' ', Color::Red, Color::White);
-    }
-
-    pub fn handle_key(&mut self, event: KeyEvent) {
-        if self.current_tty == terminal::LOG_TTY {
-            match event.key {
-                Key::Function(f) => self.switch_tty(f as usize),
-                Key::Nav(NavKey::PageUp) => terminal::scroll_up(),
-                Key::Nav(NavKey::PageDown) => terminal::scroll_down(),
-                _ => {}
-            }
-            return;
-        }
-        match event.key {
-            Key::Char(b'\n') => {
-                self.enter();
-            }
-
-            Key::Char(0x08) => {
-                self.backspace();
-            }
-
-            Key::Char(c) => {
-                self.input_char(c);
-            }
-
-            Key::Function(f) => {
-                self.switch_tty(f as usize);
-            }
-
-            Key::Nav(k) => match k {
-                NavKey::PageUp => terminal::scroll_up(),
-                NavKey::PageDown => terminal::scroll_down(),
-                _ => {}
-            },
-
-            _ => {}
-        }
-    }
-
-    fn switch_tty(&mut self, tty: usize) {
-        if tty >= MAX_TTYS {
-            return;
-        }
-
-        self.current_tty = tty;
-        terminal::switch_to(tty.try_into().unwrap());
-    }
-
-    pub fn input_char(&mut self, c: u8) {
-        let tty = self.current_tty;
-        let length = self.length[tty];
-
-        if length >= MAX_LEN_SHELL {
-            return;
-        }
-
-        self.buffer[tty][length] = c;
-        self.length[tty] += 1;
-
-        print!("{}", c as char);
-    }
-
-    pub fn backspace(&mut self) {
-        let tty = self.current_tty;
-
-        if self.length[tty] == 0 {
-            return;
-        }
-
-        self.length[tty] -= 1;
-
-        let length = self.length[tty];
-
-        self.buffer[tty][length] = 0;
-
-        terminal::backspace();
-    }
-
-    pub fn enter(&mut self) {
-        let tty = self.current_tty;
-        let length = self.length[tty];
-
-        println!();
-
-        if let Ok(command) = core::str::from_utf8(&self.buffer[tty][..length]) {
-            execute_cmd(command);
-        }
-
-        self.clear();
-
-        terminal::put_raw(b'>', Color::Red, Color::White);
-        terminal::put_raw(b' ', Color::Red, Color::White);
-    }
-
-    fn clear(&mut self) {
-        let tty = self.current_tty;
-
-        self.buffer[tty] = [0; MAX_LEN_SHELL];
-        self.length[tty] = 0;
-    }
-}
-
-static mut SHELL: Shell = Shell::new();
-
-pub fn init() {
-    unsafe {
-        (&raw mut SHELL).as_mut().unwrap().init();
-    }
-}
-
-pub fn handle_keyboard() {
-    while let Some(event) = keyboard::get_key() {
-        unsafe {
-            (&raw mut SHELL).as_mut().unwrap().handle_key(event);
-        }
-    }
-}
 
 fn command_halt() {
     println!("System halted.");
@@ -193,6 +54,11 @@ fn command_panic() {
 }
 
 fn command_help_memory() {
+    if !compositor::get_terminfo().is_full_width() {
+        println!("Cannot display: please open a full-width terminal");
+        return;
+    }
+
     println!("                          [Figure: Page Translation]                          ");
     println!("                                                                              ");
     println!("             ╓31           24╥23           16╥15            8╥7             0╖");
@@ -241,23 +107,26 @@ const PALETTE: [Color; 16] = [
 const HEX_DIGITS: &[u8; 16] = b"0123456789ABCDEF";
 
 fn command_help_vga() {
+    if !compositor::get_terminfo().is_full_width() {
+        println!("Cannot display: please open a full-width terminal");
+        return;
+    }
+
     for (bg_idx, &bg) in PALETTE.iter().enumerate() {
         for (fg_idx, &fg) in PALETTE.iter().enumerate() {
-            terminal::put_raw(b' ', fg, bg);
-            terminal::put_raw(HEX_DIGITS[fg_idx], fg, bg);
-            terminal::put_raw(HEX_DIGITS[bg_idx], fg, bg);
-            terminal::put_raw(b' ', fg, bg);
-            terminal::put_raw(b' ', fg, bg);
+            compositor::put_raw(b' ', fg, bg);
+            compositor::put_raw(HEX_DIGITS[fg_idx], fg, bg);
+            compositor::put_raw(HEX_DIGITS[bg_idx], fg, bg);
+            compositor::put_raw(b' ', fg, bg);
+            compositor::put_raw(b' ', fg, bg);
         }
         println!();
     }
-    println!();
-    println!("Characters: ");
-    println!();
+    println!("Code Page 437 character table");
     for i in 0..4u8 {
         for j in 0..64u8 {
             let c = i * 64u8 + j;
-            terminal::put_raw(c, Color::Black, Color::White);
+            compositor::put_raw(c, Color::Black, Color::White);
         }
         println!();
     }
@@ -276,7 +145,7 @@ fn command_help() {
     println!("help vga    - Code Page 437 characters and color matrix");
 }
 
-fn execute_cmd(command: &str) {
+pub fn execute_cmd(command: &str) {
     match command {
         "halt" => command_halt(),
         "reboot" => command_reboot(),
@@ -287,11 +156,12 @@ fn execute_cmd(command: &str) {
         "help" => command_help(),
         "help memory" => command_help_memory(),
         "help vga" => command_help_vga(),
+        "terminfo" => command_terminfo(),
         "" => {}
         _ => {
-            terminal::set_color(Color::Red, Color::White);
+            // terminal::set_color(Color::Red, Color::White);
             println!("Unknown command: {}", command);
-            terminal::set_color(Color::Black, Color::White);
+            // terminal::set_color(Color::Black, Color::White);
         }
     }
 }
@@ -299,8 +169,12 @@ fn execute_cmd(command: &str) {
 const BYTES_PER_LINE: usize = 16;
 const MAX_LINES: usize = 32;
 
+fn command_terminfo() {
+    println!("{}", compositor::get_terminfo());
+}
+
 fn command_clear() {
-    terminal::clear();
+    compositor::clear();
 }
 
 fn command_stack() {
