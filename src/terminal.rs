@@ -1,14 +1,11 @@
-use crate::drivers::cp437;
+use crate::scrollback;
+use crate::{drivers::cp437, scrollback::RowHandle};
 
 pub use crate::drivers::vga::{self, Color};
 
-pub const SCROLLBACK: usize = 25;
-const MAX_COLS: usize = 80;
-const BUF_SIZE: usize = MAX_COLS * SCROLLBACK;
-
 #[derive(Clone)]
 pub struct Terminal {
-    buffer: [u16; BUF_SIZE],
+    head: Option<scrollback::RowHandle>,
 
     x: usize,
     y: usize,
@@ -20,7 +17,6 @@ pub struct Terminal {
     cursor_col: usize,
 
     view_row: usize, // first visible line
-    total_rows: usize,
 
     dirty_first: usize,
     dirty_last: usize,
@@ -36,13 +32,12 @@ impl Terminal {
         Self {
             x,
             y,
-            buffer: [vga::entry(b' ', Color::Black, Color::White); BUF_SIZE],
             width,
+            head: None,
             height,
             cursor_row: 0,
             cursor_col: 0,
             view_row: 0,
-            total_rows: 0,
             pending_wrap: false,
             fg: Color::Black,
             bg: Color::White,
@@ -57,6 +52,7 @@ impl Terminal {
         self.y = y;
         self.width = width;
         self.height = height;
+        self.view_row = self.live_view_row();
         self.mark_all_dirty();
     }
 
@@ -91,46 +87,93 @@ impl Terminal {
         }
     }
 
-    pub fn flush(&mut self) {
-        if self.dirty_first <= self.dirty_last {
-            for vis in self.dirty_first..self.dirty_last + 1 {
-                let src_row = self.view_row + vis;
-                if src_row < SCROLLBACK {
-                    for col in 0..self.width {
-                        vga::put_entry_at(
-                            self.buffer[src_row * MAX_COLS + col],
-                            col + self.x,
-                            vis + self.y,
-                        );
-                    }
-                } else {
-                    for col in 0..self.width {
-                        vga::put_entry_at(
-                            vga::entry(b' ', self.fg, self.bg),
-                            col + self.x,
-                            vis + self.y,
-                        );
-                    }
-                }
-            }
-            self.mark_clean();
+    fn blank_line(&mut self, y: usize) {
+        for col in 0..self.width {
+            vga::put_entry_at(vga::entry(b' ', self.fg, self.bg), col + self.x, y + self.y);
         }
+    }
+
+    pub fn flush(&mut self) {
+        if self.dirty_first > self.dirty_last {
+            self.update_cursor();
+            return;
+        }
+
+        let (mut cur_handle, mut cur_row) = (Some(self.get_current_row()), self.cursor_row);
+        let last = self.dirty_last.min(self.cursor_row - self.view_row);
+
+        while cur_row > self.view_row + self.dirty_last {
+            cur_row -= 1;
+            if let Some(handle) = cur_handle {
+                cur_handle = handle.prev();
+            }
+        }
+
+        for y in last + 1..=self.dirty_last {
+            self.blank_line(y);
+        }
+
+        for y in (self.dirty_first..=last).rev() {
+            let row = if let Some(handle) = cur_handle {
+                scrollback::get_row_data(handle)
+            } else {
+                None
+            };
+            if let Some(row) = row {
+                for (col, &cell) in row.iter().enumerate().take(self.width) {
+                    vga::put_entry_at(cell, col + self.x, y + self.y);
+                }
+            } else {
+                self.blank_line(y);
+            }
+
+            if let Some(handle) = cur_handle {
+                cur_handle = handle.prev();
+            }
+        }
+        self.mark_clean();
         self.update_cursor();
     }
 
-    pub fn update_cursor(&self) {
+    pub fn update_cursor(&mut self) {
         let content_row = self.cursor_row.saturating_sub(self.view_row);
+        if content_row >= self.height {
+            vga::disable_cursor();
+            return;
+        }
+        vga::enable_cursor(14, 15);
         vga::set_position(self.y + content_row, self.x + self.cursor_col);
         vga::update_cursor();
+    }
+
+    fn get_current_row(&mut self) -> RowHandle {
+        if let Some(row) = self.head {
+            if scrollback::get_row_data(row).is_some() {
+                return row;
+            }
+            self.mark_all_dirty();
+        }
+        let row = scrollback::allocate_row(None, vga::entry(b' ', self.fg, self.bg));
+        self.head = Some(row);
+        row
     }
 
     pub fn put_raw(&mut self, c: u8, fg: Color, bg: Color) {
         if self.pending_wrap {
             self.newline();
         }
-        self.buffer[self.cursor_row * MAX_COLS + self.cursor_col] = vga::entry(c, fg, bg);
+        let row = scrollback::get_row_data(self.get_current_row());
+        let Some(row) = row else {
+            return;
+        };
+        row[self.cursor_col] = vga::entry(c, fg, bg);
         self.mark_row_dirty(self.cursor_row);
         self.cursor_col += 1;
+        let old_view_row = self.live_view_row();
+        if self.view_row != old_view_row {
+            self.mark_all_dirty();
+            self.view_row = old_view_row;
+        }
         if self.cursor_col >= self.width {
             self.cursor_col = self.width - 1;
             self.pending_wrap = true;
@@ -138,27 +181,41 @@ impl Terminal {
     }
 
     pub fn backspace(&mut self) {
-        if self.cursor_col > 0 {
+        if self.pending_wrap {
+            self.pending_wrap = false;
+        } else if self.cursor_col > 0 {
             self.cursor_col -= 1;
         } else if self.cursor_row > 0 {
+            let Some(prev) = self.head.and_then(|h| h.prev()) else {
+                return;
+            };
+            if scrollback::get_row_data(prev).is_none() {
+                return;
+            }
+            self.head = Some(prev);
             self.cursor_row -= 1;
             self.cursor_col = self.width - 1;
+        } else {
+            return;
         }
-        self.pending_wrap = false;
-        self.buffer[self.cursor_row * MAX_COLS + self.cursor_col] =
-            vga::entry(b' ', self.fg, self.bg);
+
+        let row = scrollback::get_row_data(self.get_current_row());
+        let Some(row) = row else { return };
+        row[self.cursor_col] = vga::entry(b' ', self.fg, self.bg);
         self.mark_row_dirty(self.cursor_row);
+        let old_view_row = self.live_view_row();
+        if old_view_row != self.view_row {
+            self.view_row = old_view_row;
+            self.mark_all_dirty();
+        }
     }
 
     pub fn clear(&mut self) {
-        let blank = vga::entry(b' ', self.fg, self.bg);
-        for cell in self.buffer.iter_mut() {
-            *cell = blank;
-        }
+        self.head = None;
         self.cursor_row = 0;
         self.cursor_col = 0;
         self.view_row = 0;
-        self.total_rows = 0;
+        self.pending_wrap = false;
         self.mark_all_dirty();
         self.flush();
     }
@@ -173,7 +230,10 @@ impl Terminal {
         for c in s.chars() {
             match c {
                 '\n' => self.newline(),
-                '\r' => self.cursor_col = 0,
+                '\r' => {
+                    self.cursor_col = 0;
+                    self.pending_wrap = false;
+                }
                 '\t' => {
                     let next = (self.cursor_col + 8) & !7usize;
                     self.cursor_col = if next >= self.width {
@@ -192,26 +252,11 @@ impl Terminal {
     }
 
     fn advance_row(&mut self) {
+        let row = scrollback::allocate_row(self.head, vga::entry(b' ', self.fg, self.bg));
         let old_view_row = self.view_row;
+
+        self.head = Some(row);
         self.cursor_row += 1;
-
-        if self.cursor_row >= SCROLLBACK {
-            // Shift scrollback buffer
-            for i in 0..(SCROLLBACK - 1) * MAX_COLS {
-                self.buffer[i] = self.buffer[i + MAX_COLS];
-            }
-            let blank = vga::entry(b' ', self.fg, self.bg);
-            let last_start = (SCROLLBACK - 1) * MAX_COLS;
-            for i in 0..MAX_COLS {
-                self.buffer[last_start + i] = blank;
-            }
-            self.cursor_row = SCROLLBACK - 1;
-            self.mark_all_dirty();
-        }
-
-        if self.cursor_row >= self.total_rows {
-            self.total_rows = self.cursor_row + 1;
-        }
 
         self.view_row = self.live_view_row();
         if self.view_row != old_view_row {

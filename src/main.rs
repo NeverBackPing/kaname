@@ -15,6 +15,7 @@ mod libk;
 mod multiboot2;
 mod pic;
 mod ports;
+mod scrollback;
 mod shell;
 mod terminal;
 
