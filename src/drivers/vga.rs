@@ -69,20 +69,41 @@ pub fn clear_screen(fg: Color, bg: Color) {
     }
 }
 
+static mut CURSOR_VISIBLE: Option<bool> = None;
+static mut CURSOR_POS: u16 = u16::MAX;
+
 pub fn enable_cursor(start: u8, end: u8) {
+    unsafe {
+        if CURSOR_VISIBLE == Some(true) {
+            return;
+        }
+        CURSOR_VISIBLE = Some(true);
+    }
     ports::outb(0x3D4, 0x0A);
-    ports::outb(0x3D5, (ports::inb(0x3D5) & 0xC0) | start);
+    ports::outb(0x3D5, start);
     ports::outb(0x3D4, 0x0B);
-    ports::outb(0x3D5, (ports::inb(0x3D5) & 0xE0) | end);
+    ports::outb(0x3D5, end);
 }
 
 pub fn disable_cursor() {
+    unsafe {
+        if CURSOR_VISIBLE == Some(false) {
+            return;
+        }
+        CURSOR_VISIBLE = Some(false);
+    }
     ports::outb(0x3D4, 0x0A);
     ports::outb(0x3D5, 0x20);
 }
 
 pub fn update_cursor() {
     let pos: u16 = unsafe { ROW * WIDTH + COL } as u16;
+    unsafe {
+        if CURSOR_POS == pos {
+            return;
+        }
+        CURSOR_POS = pos;
+    }
     ports::outb(0x3D4, 0x0F);
     ports::outb(0x3D5, pos as u8);
     ports::outb(0x3D4, 0x0E);
